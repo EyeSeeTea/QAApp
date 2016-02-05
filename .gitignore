@@ -1,3 +1,9 @@
+# iml files (idea)
+*.iml
+
+#Idea custom configuration
+.idea/
+
 # Built application files
 *.apk
 *.ap_
@@ -30,3 +36,8 @@ proguard/
 
 # Android Studio captures folder
 captures/
+
+/.idea/workspace.xml
+/.idea/libraries
+.DS_Store
+app/fabric.properties
