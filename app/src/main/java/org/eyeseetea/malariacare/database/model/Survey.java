@@ -19,18 +19,16 @@
 
 package org.eyeseetea.malariacare.database.model;
 
-import android.util.Log;
-
 import com.raizlabs.android.dbflow.annotation.Column;
-import com.raizlabs.android.dbflow.annotation.ForeignKey;
-import com.raizlabs.android.dbflow.annotation.ForeignKeyReference;
-import com.raizlabs.android.dbflow.annotation.OneToMany;
 import com.raizlabs.android.dbflow.annotation.PrimaryKey;
 import com.raizlabs.android.dbflow.annotation.Table;
+import com.raizlabs.android.dbflow.sql.QueryBuilder;
 import com.raizlabs.android.dbflow.sql.builder.Condition;
 import com.raizlabs.android.dbflow.sql.language.ColumnAlias;
 import com.raizlabs.android.dbflow.sql.language.Join;
 import com.raizlabs.android.dbflow.sql.language.Select;
+import com.raizlabs.android.dbflow.sql.language.Update;
+import com.raizlabs.android.dbflow.sql.language.Where;
 import com.raizlabs.android.dbflow.structure.BaseModel;
 
 import org.eyeseetea.malariacare.database.AppDatabase;
@@ -38,6 +36,8 @@ import org.eyeseetea.malariacare.database.iomodules.dhis.exporter.IConvertToSDKV
 import org.eyeseetea.malariacare.database.iomodules.dhis.exporter.VisitableToSDK;
 import org.eyeseetea.malariacare.database.utils.SurveyAnsweredRatio;
 import org.eyeseetea.malariacare.database.utils.SurveyAnsweredRatioCache;
+import org.eyeseetea.malariacare.database.utils.planning.SurveyPlanner;
+import org.eyeseetea.malariacare.layout.score.ScoreRegister;
 import org.eyeseetea.malariacare.utils.Constants;
 
 import java.util.Date;
@@ -45,8 +45,6 @@ import java.util.List;
 
 @Table(databaseName = AppDatabase.NAME)
 public class Survey extends BaseModel implements VisitableToSDK {
-    public static final float MAX_AMBER = 80f;
-    public static final float MAX_RED = 50f;
 
     @Column
     @PrimaryKey(autoincrement = true)
@@ -74,16 +72,32 @@ public class Survey extends BaseModel implements VisitableToSDK {
     User user;
 
     @Column
-    Date eventDate;
+    Date creationDate;
+
     @Column
     Date completionDate;
+
+    @Column
+    Date eventDate;
+
+    @Column
+    Date scheduledDate;
+
     @Column
     Integer status;
+
+    @Column
+    String eventuid;
 
     /**
      * List of values for this survey
      */
     List<Value> values;
+
+    /**
+     * List of historic previous schedules
+     */
+    List<SurveySchedule> surveySchedules;
 
     /**
      * Calculated answered ratio for this survey according to its values
@@ -96,14 +110,20 @@ public class Survey extends BaseModel implements VisitableToSDK {
     Float mainScore;
 
     public Survey() {
+        //Set dates
+        this.creationDate = new Date();
+        this.completionDate = this.creationDate;
+        this.eventDate = new Date();
+        this.scheduledDate = null;
     }
 
     public Survey(OrgUnit orgUnit, TabGroup tabGroup, User user) {
-        this.eventDate = new Date();
-        this.status = Constants.SURVEY_IN_PROGRESS; // Possibilities [ In progress | Completed | Sent ]
-        this.completionDate = this.eventDate;
-        Log.i(".Survey", Long.valueOf(this.completionDate.getTime()).toString());
+        this();
 
+        // Possibilities [ In progress | Completed | Sent ]
+        this.status = Constants.SURVEY_IN_PROGRESS;
+
+        //Set context of the survey
         this.setOrgUnit(orgUnit);
         this.setTabGroup(tabGroup);
         this.setUser(user);
@@ -115,6 +135,14 @@ public class Survey extends BaseModel implements VisitableToSDK {
 
     public void setId_survey(Long id_survey) {
         this.id_survey = id_survey;
+    }
+
+    public String getEventUid() {
+        return eventuid;
+    }
+
+    public void setEventUid(String eventuid) {
+        this.eventuid = eventuid;
     }
 
     public OrgUnit getOrgUnit() {
@@ -180,12 +208,12 @@ public class Survey extends BaseModel implements VisitableToSDK {
         this.user = null;
     }
 
-    public Date getEventDate() {
-        return eventDate;
+    public Date getCreationDate() {
+        return creationDate;
     }
 
-    public void setEventDate(Date eventDate) {
-        this.eventDate = eventDate;
+    public void setCreationDate(Date creationDate) {
+        this.creationDate = creationDate;
     }
 
     public Date getCompletionDate(){
@@ -194,6 +222,22 @@ public class Survey extends BaseModel implements VisitableToSDK {
 
     public void setCompletionDate(Date completionDate){
         this.completionDate=completionDate;
+    }
+
+    public Date getEventDate() {
+        return eventDate;
+    }
+
+    public void setEventDate(Date eventDate) {
+        this.eventDate = eventDate;
+    }
+
+    public Date getScheduledDate() {
+        return scheduledDate;
+    }
+
+    public void setScheduledDate(Date scheduledDate) {
+        this.scheduledDate = scheduledDate;
     }
 
     public Integer getStatus() {
@@ -210,6 +254,30 @@ public class Survey extends BaseModel implements VisitableToSDK {
      */
     public boolean isSent(){
         return Constants.SURVEY_SENT==this.status;
+    }
+
+    /**
+     * Checks if the survey is PLANNED
+     * @return true|false
+     */
+    public boolean isPlanned(){
+        return Constants.SURVEY_PLANNED==this.status;
+    }
+
+    /**
+     * Checks if the survey is IN_PROGRESS
+     * @return true|false
+     */
+    public boolean isInProgress(){
+        return Constants.SURVEY_IN_PROGRESS==this.status;
+    }
+
+    /**
+     * Checks if the survey has been completed or not
+     * @return true|false
+     */
+    public boolean isCompleted(){
+        return Constants.SURVEY_COMPLETED==this.status;
     }
 
     public Float getMainScore() {
@@ -230,7 +298,13 @@ public class Survey extends BaseModel implements VisitableToSDK {
         if(mainScore!=null){
             valScore=mainScore;
         }
-        Score score=new Score(this,"",valScore);
+        //Update or New row
+        Score score=getScore();
+        if(score==null){
+            score=new Score(this,"",valScore);
+        }else{
+            score.setScore(valScore);
+        }
         score.save();
     }
 
@@ -261,7 +335,7 @@ public class Survey extends BaseModel implements VisitableToSDK {
      * @return
      */
     public boolean isTypeA(){
-        return this.mainScore>= MAX_AMBER;
+        return this.getMainScore()>= Constants.MAX_AMBER;
     }
 
     /**
@@ -269,7 +343,7 @@ public class Survey extends BaseModel implements VisitableToSDK {
      * @return
      */
     public boolean isTypeB(){
-        return this.mainScore>= MAX_RED && !isTypeA();
+        return this.getMainScore()>= Constants.MAX_RED && !isTypeA();
     }
 
     /**
@@ -292,6 +366,30 @@ public class Survey extends BaseModel implements VisitableToSDK {
                             .eq(this.getId_survey())).queryList();
         }
         return values;
+    }
+
+    /**
+     * Returns the list of previous schedules for this survey
+     * @return
+     */
+    public List<SurveySchedule> getSurveySchedules(){
+        if(surveySchedules==null){
+            surveySchedules = new Select()
+                    .from(SurveySchedule.class)
+                    .where(Condition.column(SurveySchedule$Table.ID_SURVEY)
+                            .eq(this.getId_survey())).queryList();
+        }
+        return surveySchedules;
+    }
+
+    /**
+     * Update the SurveySchedule to be set in a new survey, and could remove the old survey without lost that
+     * @param newSurvey to set the SurveSchedule
+     */
+    public void setSurveyScheduleToSurvey(Survey newSurvey){
+        Where update = new Update<>(SurveySchedule.class).set(Condition.column(SurveySchedule$Table.ID_SURVEY).eq(newSurvey.getId_survey()))
+                .where(Condition.column(SurveySchedule$Table.ID_SURVEY).is(id_survey));
+        update.queryClose();
     }
 
     /**
@@ -330,11 +428,13 @@ public class Survey extends BaseModel implements VisitableToSDK {
      * Calculates the current ratio of completion for this survey
      * @return SurveyAnsweredRatio that hold the total & answered questions.
      */
-    private SurveyAnsweredRatio reloadSurveyAnsweredRatio(){
+    public SurveyAnsweredRatio reloadSurveyAnsweredRatio(){
         int numRequired = Question.countRequiredByProgram(this.getTabGroup());
+        int numCompulsory=Question.countCompulsoryByProgram(this.getTabGroup());
         int numOptional = (int)countNumOptionalQuestionsToAnswer();
         int numAnswered = Value.countBySurvey(this);
-        SurveyAnsweredRatio surveyAnsweredRatio=new SurveyAnsweredRatio(numRequired+numOptional, numAnswered);
+        int numCompulsoryAnswered = Value.countCompulsoryBySurvey(this);
+        SurveyAnsweredRatio surveyAnsweredRatio=new SurveyAnsweredRatio(numRequired+numOptional, numAnswered,numCompulsory,numCompulsoryAnswered);
         SurveyAnsweredRatioCache.put(this.id_survey, surveyAnsweredRatio);
         return surveyAnsweredRatio;
     }
@@ -349,10 +449,6 @@ public class Survey extends BaseModel implements VisitableToSDK {
                 .on(
                         Condition.column(ColumnAlias.columnWithTable("q", Question$Table.ID_QUESTION))
                                 .eq(ColumnAlias.columnWithTable("qr", QuestionRelation$Table.ID_QUESTION)))
-                .join(Answer.class, Join.JoinType.LEFT).as("a")
-                .on(
-                        Condition.column(ColumnAlias.columnWithTable("q", Question$Table.ID_ANSWER))
-                                .eq(ColumnAlias.columnWithTable("a", Answer$Table.ID_ANSWER)))
                 .join(Match.class, Join.JoinType.LEFT).as("m")
                 .on(
                         Condition.column(ColumnAlias.columnWithTable("qr", QuestionRelation$Table.ID_QUESTION_RELATION))
@@ -372,7 +468,7 @@ public class Survey extends BaseModel implements VisitableToSDK {
                         //For the given survey
                 .and(Condition.column(ColumnAlias.columnWithTable("v", Value$Table.ID_SURVEY)).eq(this.getId_survey()))
                         //The child question requires an answer
-                .and(Condition.column(ColumnAlias.columnWithTable("a", Answer$Table.OUTPUT)).isNot(Constants.NO_ANSWER))
+                .and(Condition.column(ColumnAlias.columnWithTable("q", Question$Table.OUTPUT)).isNot(Constants.NO_ANSWER))
                 .count();
 
         //Parent with the right value -> not hidden
@@ -389,43 +485,58 @@ public class Survey extends BaseModel implements VisitableToSDK {
             return;
         }
 
-        SurveyAnsweredRatio answeredRatio=this.reloadSurveyAnsweredRatio();
 
-        //Update status & completionDate
-        if(answeredRatio.isCompleted()) {
-            this.setStatus(Constants.SURVEY_COMPLETED);
-            this.setCompletionDate(new Date());
-        }else{
+        SurveyAnsweredRatio answeredRatio = this.reloadSurveyAnsweredRatio();
+
+        SurveyAnsweredRatio surveyAnsweredRatio = this.getAnsweredQuestionRatio();
+        if (surveyAnsweredRatio.getTotalCompulsory()==0) {
+            //Update status
+            if(!answeredRatio.isCompleted())
             this.setStatus(Constants.SURVEY_IN_PROGRESS);
-            this.setCompletionDate(this.eventDate);
+
         }
+        else if(surveyAnsweredRatio.getCompulsoryAnswered()==0){
+            this.setStatus(Constants.SURVEY_IN_PROGRESS);
+        }
+        //CompletionDate
+        this.setCompletionDate(new Date());
+
 
         //Saves new status & completionDate
         this.save();
     }
 
+    private void saveScore() {        //Prepare scores info
+        List<CompositeScore> compositeScoreList= ScoreRegister.loadCompositeScores(this);
+
+        //Calculate main score to push later
+        this.setMainScore(ScoreRegister.calculateMainScore(compositeScoreList));
+        this.saveMainScore();
+    }
+
     /**
-     * Returns a concrete survey, if it exists
+     * Returns a survey in progress for the given orgUnit and tabGroup
      * @param orgUnit
      * @param tabGroup
      * @return
      */
-    public static List<Survey> getUnsentSurveys(OrgUnit orgUnit, TabGroup tabGroup) {
+    public static Survey getInProgressSurveys(OrgUnit orgUnit, TabGroup tabGroup) {
         return new Select().from(Survey.class)
                 .where(Condition.column(Survey$Table.ID_ORG_UNIT).eq(orgUnit.getId_org_unit()))
                 .and(Condition.column(Survey$Table.ID_TAB_GROUP).eq(tabGroup.getId_tab_group()))
-                .and(Condition.column(Survey$Table.STATUS).isNot(Constants.SURVEY_SENT))
+                .and(Condition.column(Survey$Table.STATUS).is(Constants.SURVEY_IN_PROGRESS))
                 .orderBy(Survey$Table.EVENTDATE)
-                .orderBy(Survey$Table.ID_ORG_UNIT).queryList();
+                .orderBy(Survey$Table.ID_ORG_UNIT).querySingle();
     }
 
     /**
      * Returns all the surveys with status yet not put to "Sent"
      * @return
      */
-    public static List<Survey> getAllUnsentSurveys() {
+    public static List<Survey> getAllUnsentUnplannedSurveys() {
         return new Select().from(Survey.class)
                 .where(Condition.column(Survey$Table.STATUS).isNot(Constants.SURVEY_SENT))
+                .and(Condition.column(Survey$Table.STATUS).isNot(Constants.SURVEY_PLANNED))
                 .orderBy(Survey$Table.EVENTDATE)
                 .orderBy(Survey$Table.ID_ORG_UNIT).queryList();
     }
@@ -491,16 +602,6 @@ public class Survey extends BaseModel implements VisitableToSDK {
                 .orderBy(Survey$Table.ID_ORG_UNIT).queryList();
     }
 
-    /**
-     * Returns all the surveys with status put to "In progress"
-     * @return
-     */
-    public static List<Survey> getAllUncompletedSurveys() {
-        return new Select().from(Survey.class)
-                .where(Condition.column(Survey$Table.STATUS).eq(Constants.SURVEY_IN_PROGRESS))
-                .orderBy(Survey$Table.EVENTDATE)
-                .orderBy(Survey$Table.ID_ORG_UNIT).queryList();
-    }
 
     /**
      * Returns the last surveys (by date) with status put to "In progress"
@@ -520,6 +621,138 @@ public class Survey extends BaseModel implements VisitableToSDK {
         IConvertToSDKVisitor.visit(this);
     }
 
+    /**
+     * Returns the last surveys (by date) without status Completed or sent
+     * @return
+     */
+    public static List<Survey> getAllInProgressSurveys() {
+        return new Select().from(Survey.class)
+                .where(Condition.column(Survey$Table.STATUS).is(Constants.SURVEY_IN_PROGRESS))
+                .orderBy(Survey$Table.EVENTDATE)
+                .orderBy(Survey$Table.ID_ORG_UNIT).queryList();
+    }
+    /**
+     * Returns the last surveys (by date) with status Completed or sent
+     * @return
+     */
+    public static List<Survey> getAllCompletedUnsentSurveys() {
+        return new Select().from(Survey.class)
+                .where(Condition.column(Survey$Table.STATUS).is(Constants.SURVEY_COMPLETED))
+                .orderBy(Survey$Table.EVENTDATE)
+                .orderBy(Survey$Table.ID_ORG_UNIT).queryList();
+    }
+    /**
+     * Returns all the surveys with status put to "Sent" or completed
+     * @return
+     */
+    public static List<Survey> getAllSentOrCompletedSurveys() {
+        return new Select().from(Survey.class)
+                .where(Condition.column(Survey$Table.STATUS).eq(Constants.SURVEY_SENT))
+                .or(Condition.column(Survey$Table.STATUS).eq(Constants.SURVEY_COMPLETED))
+                .orderBy(Survey$Table.EVENTDATE)
+                .orderBy(Survey$Table.ID_ORG_UNIT).queryList();
+    }
+
+
+    public void prepareSurveyCompletionDate() {
+        if (!isSent()) {
+            setCompletionDate(new Date());
+            save();
+        }
+    }
+
+    public void setSentSurveyState(){
+        //Change status and save mainScore
+        setStatus(Constants.SURVEY_SENT);
+        save();
+        saveMainScore();
+    }
+
+    public void setCompleteSurveyState(){
+        setStatus(Constants.SURVEY_COMPLETED);
+        saveScore();
+        save();
+        saveMainScore();
+        //Plan a new survey for the future
+        SurveyPlanner.getInstance().buildNext(this);
+    }
+
+    /**
+     * Moves the schedule date for this survey to a new given date due to a given reason (comment)
+     * @param newScheduledDate
+     * @param comment
+     */
+    public void reschedule(Date newScheduledDate, String comment) {
+        //Take currentDate
+        Date currentScheduleDate=this.getScheduledDate();
+
+        //Add a history
+        SurveySchedule previousSchedule=new SurveySchedule(this,currentScheduleDate,comment);
+        previousSchedule.save();
+
+        //Clean inner lazy schedulelist
+        surveySchedules=null;
+
+        //Move scheduledate and save
+        this.scheduledDate=newScheduledDate;
+        this.save();
+    }
+
+    /**
+     * Returns all surveys which status is 'planned' or 'in progress'
+     * @return
+     */
+    public static List<Survey> findPlannedOrInProgress(){
+        return new Select()
+                .from(Survey.class)
+                .where(Condition.column(Survey$Table.STATUS).eq(Constants.SURVEY_PLANNED))
+                .or(Condition.column(Survey$Table.STATUS).eq(Constants.SURVEY_IN_PROGRESS))
+                .orderBy(true, Survey$Table.SCHEDULEDDATE)
+                .queryList();
+    }
+
+    /**
+     * Returns survey which state is 'in progress' or 'sent'
+     * @return
+     */
+    public static List<Survey> findInProgressOrSent() {
+        return new Select()
+                .from(Survey.class)
+                .where(Condition.column(Survey$Table.STATUS).eq(Constants.SURVEY_IN_PROGRESS))
+                .or(Condition.column(Survey$Table.STATUS).eq(Constants.SURVEY_SENT))
+                .orderBy(Survey$Table.EVENTDATE)
+                .orderBy(Survey$Table.ID_ORG_UNIT)
+                .queryList();
+    }
+
+    /**
+     * Finds a survey with a given orgunit and tabgroup
+     * @param orgUnit
+     * @param tabGroup
+     * @return
+     */
+    public static Survey findByOrgUnitAndTabGroup(OrgUnit orgUnit, TabGroup tabGroup) {
+        return new Select()
+                .from(Survey.class)
+                .where(Condition.column(Survey$Table.ID_ORG_UNIT).eq(orgUnit.getId_org_unit()))
+                .and(Condition.column(Survey$Table.ID_TAB_GROUP).eq(tabGroup.getId_tab_group()))
+                .and(Condition.column(Survey$Table.STATUS).eq(Constants.SURVEY_PLANNED))
+                .querySingle();
+    }
+
+    /**
+     * Find the last survey that has been sent for each orgunit+tabgroup combination
+     * @return
+     */
+    public static List<Survey> listLastByOrgUnitTabGroup() {
+        return new Select()
+                .from(Survey.class)
+                .where()
+                .groupBy(new QueryBuilder().appendQuotedArray(Survey$Table.ID_ORG_UNIT, Survey$Table.ID_TAB_GROUP))
+                .having(Condition.columnsWithFunction("max", "eventDate"))
+                .queryList();
+    }
+
     @Override
     public boolean equals(Object o) {
         if (this == o) return true;
@@ -534,9 +767,15 @@ public class Survey extends BaseModel implements VisitableToSDK {
             return false;
         if (id_user != null ? !id_user.equals(survey.id_user) : survey.id_user != null)
             return false;
-        if (eventDate != null ? !eventDate.equals(survey.eventDate) : survey.eventDate != null)
+        if (creationDate != null ? !creationDate.equals(survey.creationDate) : survey.creationDate != null)
             return false;
         if (completionDate != null ? !completionDate.equals(survey.completionDate) : survey.completionDate != null)
+            return false;
+        if (eventDate != null ? !eventDate.equals(survey.eventDate) : survey.eventDate != null)
+            return false;
+        if (eventuid != null ? !eventuid.equals(survey.eventuid) : survey.eventuid != null)
+            return false;
+        if (scheduledDate != null ? !scheduledDate.equals(survey.scheduledDate) : survey.scheduledDate != null)
             return false;
         return !(status != null ? !status.equals(survey.status) : survey.status != null);
 
@@ -548,8 +787,11 @@ public class Survey extends BaseModel implements VisitableToSDK {
         result = 31 * result + (id_tab_group != null ? id_tab_group.hashCode() : 0);
         result = 31 * result + (id_org_unit != null ? id_org_unit.hashCode() : 0);
         result = 31 * result + (id_user != null ? id_user.hashCode() : 0);
-        result = 31 * result + (eventDate != null ? eventDate.hashCode() : 0);
+        result = 31 * result + (creationDate != null ? creationDate.hashCode() : 0);
         result = 31 * result + (completionDate != null ? completionDate.hashCode() : 0);
+                result = 31 * result + (eventDate != null ? eventDate.hashCode() : 0);
+        result = 31 * result + (eventuid != null ? eventuid.hashCode() : 0);
+        result = 31 * result + (scheduledDate != null ? scheduledDate.hashCode() : 0);
         result = 31 * result + (status != null ? status.hashCode() : 0);
         return result;
     }
@@ -561,9 +803,12 @@ public class Survey extends BaseModel implements VisitableToSDK {
                 ", id_tab_group=" + id_tab_group +
                 ", id_org_unit=" + id_org_unit +
                 ", id_user=" + id_user +
-                ", eventDate=" + eventDate +
+                ", creationDate=" + creationDate +
                 ", completionDate=" + completionDate +
+                ", eventDate=" + eventDate +
+                ", scheduledDate=" + scheduledDate +
                 ", status=" + status +
+                ", eventuid="+eventuid+
                 '}';
     }
 }

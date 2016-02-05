@@ -31,15 +31,19 @@ import org.eyeseetea.malariacare.database.model.Value;
 import org.eyeseetea.malariacare.database.utils.LocationMemory;
 import org.eyeseetea.malariacare.database.utils.PreferencesState;
 import org.eyeseetea.malariacare.database.utils.Session;
+import org.eyeseetea.malariacare.database.utils.planning.SurveyPlanner;
 import org.eyeseetea.malariacare.layout.score.ScoreRegister;
 import org.eyeseetea.malariacare.utils.Constants;
 import org.eyeseetea.malariacare.utils.Utils;
 import org.hisp.dhis.android.sdk.persistence.models.DataValue;
 import org.hisp.dhis.android.sdk.persistence.models.Event;
+import org.hisp.dhis.android.sdk.persistence.models.ImportSummary;
 
 import java.util.ArrayList;
 import java.util.Date;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 
 /**
  * Turns a given survey into its corresponding events+datavalues.
@@ -68,6 +72,7 @@ public class ConvertToSDKVisitor implements IConvertToSDKVisitor {
      * List of events that are going to be pushed
      */
     List<Event> events;
+
 
     /**
      * The last survey that it is being translated
@@ -178,10 +183,16 @@ public class ConvertToSDKVisitor implements IConvertToSDKVisitor {
      * Fulfills the dates of the event
      */
     private void updateEventDates() {
-        completionDate=new Date();
-        String completionDateStr=EventExtended.format(completionDate);
-        currentEvent.setEventDate(completionDateStr);
-        currentEvent.setLastUpdated(completionDateStr);
+
+        //Sent date 'now' (this change will be saves after successful push)
+        currentSurvey.setEventDate(new Date());
+
+        completionDate=currentSurvey.getCreationDate();
+
+        // NOTE: do not try to set the event creation date. SDK will try to update the event in the next push instead of creating it and that will crash
+        currentEvent.setLastUpdated(EventExtended.format(currentSurvey.getCompletionDate()));
+        currentEvent.setEventDate(EventExtended.format(currentSurvey.getEventDate()));
+        currentEvent.setDueDate(EventExtended.format(currentSurvey.getScheduledDate()));
     }
 
     /**
@@ -226,6 +237,7 @@ public class ConvertToSDKVisitor implements IConvertToSDKVisitor {
         currentSurvey.setMainScore(ScoreRegister.calculateMainScore(compositeScores));
         currentSurvey.setStatus(Constants.SURVEY_SENT);
         currentSurvey.setCompletionDate(completionDate);
+        currentSurvey.setEventUid(currentEvent.getUid());
     }
 
     /**
@@ -255,23 +267,49 @@ public class ConvertToSDKVisitor implements IConvertToSDKVisitor {
     private void annotateSurveyAndEvent() {
         surveys.add(currentSurvey);
         events.add(currentEvent);
-
-        Log.d(TAG,String.format("%d surveys converted so far",surveys.size()));
+        Log.d(TAG, String.format("%d surveys converted so far", surveys.size()));
     }
 
     /**
      * Saves changes in the survey (supposedly after a successfull push)
      */
-    public void saveSurveyStatus(){
+    public void saveSurveyStatus(Map<Long,ImportSummary> importSummaryMap){
         for(int i=0;i<surveys.size();i++){
             Survey iSurvey=surveys.get(i);
             Event iEvent=events.get(i);
+            ImportSummary importSummary=importSummaryMap.get(iEvent.getLocalId());
+            if(hasImportSummaryErrors(importSummary)){
+                //Some error while pushing should be done again
+                iSurvey.setStatus(Constants.SURVEY_IN_PROGRESS);
+                iSurvey.save();
 
-            iSurvey.saveMainScore();
-            iSurvey.save();
-            //To avoid several pushes
-            iEvent.setFromServer(true);
-            iEvent.save();
+                //Generated event must be remove too
+                iEvent.delete();
+            }else{
+                iSurvey.saveMainScore();
+                iSurvey.save();
+
+                //To avoid several pushes
+                iEvent.setFromServer(true);
+                iEvent.save();
+            }
         }
+    }
+
+    /**
+     * Checks whether the given importSummary contains errors or has been successful.
+     * An import with 0 importedItems is an error too.
+     * @param importSummary
+     * @return
+     */
+    private boolean hasImportSummaryErrors(ImportSummary importSummary){
+        if(importSummary==null){
+            return true;
+        }
+
+        if(importSummary.getImportCount()==null){
+            return true;
+        }
+        return importSummary.getImportCount().getImported()==0;
     }
 }

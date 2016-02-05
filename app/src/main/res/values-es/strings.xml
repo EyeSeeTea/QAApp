@@ -38,11 +38,17 @@
     <string name="dialog_content_existing_survey">Ya existe una encuesta previa no enviada para esa centro/tipo de encuesta</string>
     <string name="dialog_content_logout_confirmation">Si se desconecta del sistema, se borrarán todas las encuestas no enviadas. ¿Quiere continuar?</string>
     <string name="dialog_title_send_preview">Enviar o previsualizar</string>
-    <string name="dialog_content_send_preview">¿Desea enviar o previsualizar el feedback?</string>
+    <string name="dialog_content_send_preview">¿Desea enviar?</string>
     <string name="dialog_title_push_data">Enviar los datos</string>
     <string name="dialog_content_push_data">¿Está seguro de enviar? No podrá deshacer esta acción</string>
     <string name="dialog_button_preview_feedback">Ver feedback</string>
-
+    <string name="dialog_question_complete_survey">Todas las preguntas obligatorias han sido rellenadas. ¿Quiere marcar esta encuesta como completa?</string>
+    <string name="dialog_continue_later_option">Continuar despues</string>
+    <string name="dialog_complete_option">Completar</string>
+    <string name="dialog_are_you_sure_complete_survey">¿Está seguro? Esta acción no se puede deshacer y usted ya no será capaz de editar o borrar la encuesta</string>
+    <string name="dialog_incompleted_compulsory_survey">Esta encuesta no puede ser enviado todavía. Por favor responda al menos todas las preguntas obligatorias</string>
+    <string name="dialog_incompleted_compulsory_pulling">La actualización de los metadatos requiere eliminar o completar sus datos enviados. Por favor responda al menos todas las preguntas obligatorias</string>
+    <string name="dialog_sent_survey_on_refresh_metadata">La actualización de metadatos borrará los datos enviados. Usted tiene %s encuestas no enviada/s. ¿Desea usted enviarlas antes de actualizar los metadatos?</string>
     <!-- Toast -->
     <string name="cancellingPull">El proceso se cancelara en unos segundos</string>
 
@@ -60,7 +66,7 @@
     <string name="dashboard_title_table_facilities">Calidad de cuidados (ultimos 6 meses)</string>
 
     <!-- create -->
-    <string name="create_info_ok">Empezar Evaluación</string>
+    <string name="create_info_ok">Empezar</string>
     <string name="create_info_organization_unit">Unidad de organización</string>
     <string name="create_info_survey">Formulario</string>
     <string name="create_info_tabs_group">Grupo de Pestañas</string>
@@ -71,12 +77,15 @@
     <string name="assessment_title_state">Estado</string>
     <string name="assessment_info_delete">Eliminar</string>
     <string name="assessment_title_header">Evaluación(es) Activa(s)</string>
+    <string name="all_assessment">Todas las evaluaciones</string>
 
     <!-- feedback -->
     <!-- XXX Should it be replaced by 'assessment_title_facility_date'?-->
     <string name="feedback_title_organization_unit_date">Unidad de organización/ Date</string>
     <string name="feedback_title_header">Realimentación</string>
     <string name="feedback_show_only_failed">Mostrar solo preguntas falladas</string>
+    <string name="feedback_return">Regresar a todas las evaluaciones</string>
+    <string name="quality_of_care">Calidad de la Asistencia (QoC) Puntuación:</string>
     <string name="feedback_info_passed">Aprobado</string>
     <string name="feedback_info_failed">Suspenso</string>
     <string name="feedback_info_not_answered">Sin respuesta</string>
@@ -232,5 +241,31 @@
     <string name="dialog_push_success">Encuestra correctamente subida al servidor Dhis</string>
     <string name="progress_push_no_survey">No hay encuesta para subir</string>
     <string name="dialog_push_before_pull_success">Encuestas correctamente subidas al servidor Dhis, inicializando actualización de metadatos</string>
+    <string name="dashboard_title_planned_next_qa">Próxima evaluación</string>
+    <string name="dashboard_title_planned_productivity">Prd</string>
+    <string name="dashboard_title_planned_quality_of_care">QoC</string>
+    <string name="dashboard_title_planned_type_future">Futuro</string>
+    <string name="dashboard_title_planned_type_never">Nunca evaluado</string>
+    <string name="dashboard_title_planned_type_next_30">Próximos 30 dias</string>
+    <string name="dashboard_title_planned_type_overdue">Atrasado</string>
+    <string name="planning_title_dialog">Planificar evaluación</string>
+    <string name="planning_label_comment">* Comentario</string>
+    <string name="planning_label_schedule_date">* Fecha planificada</string>
+    <string name="option_edit">Editar</string>
+    <string name="option_mark_completed">Marcar como completa</string>
+    <string name="option_delete">Borrar</string>
+    <string name="dialog_info_push_confirm">estás seguro? No podrás deshacer esta acción</string>
 
+
+    <string name="hide_planning_tab_title" >Ocultar ficha planificación</string>
+    <string name="hide_planning_tab_summary" >Marque esta casilla para ocultar ficha de planificación</string>
+    <string name="plan">planificación</string>
+    <string name="assess">encuesta</string>
+    <string name="improve">mejora</string>
+    <string name="monitor">monitorización</string>
+
+
+    <!-- filters text -->
+    <string name="filter_all_org_units_upper">TODAS LAS UNIDADES ORGANIZATIVAS</string>
+    <string name="filter_all_org_assessments_upper">TODAS LAS EVALUACIONES</string>
 </resources>

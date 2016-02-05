@@ -19,41 +19,39 @@
 
 package org.eyeseetea.malariacare.fragments;
 
-import android.app.AlertDialog;
+import android.app.Activity;
 import android.app.ListFragment;
 import android.content.BroadcastReceiver;
 import android.content.Context;
-import android.content.DialogInterface;
 import android.content.Intent;
 import android.content.IntentFilter;
-import android.os.Build;
 import android.os.Bundle;
 import android.support.v4.content.LocalBroadcastManager;
 import android.util.Log;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
-import android.webkit.WebView;
-import android.webkit.WebViewClient;
+import android.widget.AdapterView;
 import android.widget.BaseAdapter;
 import android.widget.ListView;
+import android.widget.Spinner;
 
-import org.eyeseetea.malariacare.DashboardActivity;
-import org.eyeseetea.malariacare.FeedbackActivity;
 import org.eyeseetea.malariacare.R;
+import org.eyeseetea.malariacare.database.model.OrgUnit;
+import org.eyeseetea.malariacare.database.model.Program;
 import org.eyeseetea.malariacare.database.model.Survey;
-import org.eyeseetea.malariacare.database.utils.monitor.FacilityTableBuilder;
-import org.eyeseetea.malariacare.database.utils.monitor.PieTabGroupBuilder;
-import org.eyeseetea.malariacare.database.utils.monitor.SentSurveysBuilder;
+import org.eyeseetea.malariacare.database.utils.PreferencesState;
 import org.eyeseetea.malariacare.database.utils.Session;
 import org.eyeseetea.malariacare.layout.adapters.dashboard.AssessmentSentAdapter;
 import org.eyeseetea.malariacare.layout.adapters.dashboard.IDashboardAdapter;
-import org.eyeseetea.malariacare.layout.listeners.SwipeDismissListViewTouchListener;
-import org.eyeseetea.malariacare.layout.utils.LayoutUtils;
+import org.eyeseetea.malariacare.layout.adapters.filters.FilterOrgUnitArrayAdapter;
+import org.eyeseetea.malariacare.layout.adapters.filters.FilterProgramArrayAdapter;
 import org.eyeseetea.malariacare.services.SurveyService;
 import org.eyeseetea.malariacare.views.CustomTextView;
 
 import java.util.ArrayList;
+import java.util.Collections;
+import java.util.Comparator;
 import java.util.HashMap;
 import java.util.List;
 
@@ -64,13 +62,26 @@ public class DashboardSentFragment extends ListFragment {
 
 
     public static final String TAG = ".CompletedFragment";
+    private final static int WITHOUT_ORDER =0;
+    private final static int FACILITY_ORDER =1;
+    private final static int DATE_ORDER =2;
+    private final static int SCORE_ORDER =3;
+    private static int LAST_ORDER =WITHOUT_ORDER;
     private SurveyReceiver surveyReceiver;
     private List<Survey> surveys;
     protected IDashboardAdapter adapter;
     private static int index = 0;
-    private WebView webView;
     List<Survey> oneSurveyForOrgUnit;
-    List<Survey> surveysForGraphic;
+    List<OrgUnit> orgUnitList;
+    List <Program> programList;
+    Spinner filterSpinnerOrgUnit;
+    Spinner filterSpinnerProgram;
+    String orgUnitFilter;
+    String programFilter;
+    int orderBy=WITHOUT_ORDER;
+    static boolean reverse=false;
+    OnFeedbackSelectedListener mCallback;
+
     public DashboardSentFragment() {
         this.adapter = Session.getAdapterSent();
         this.surveys = new ArrayList();
@@ -89,6 +100,26 @@ public class DashboardSentFragment extends ListFragment {
     }
 
 
+    // Container Activity must implement this interface
+    public interface OnFeedbackSelectedListener {
+        public void onFeedbackSelected(Survey survey);
+    }
+
+
+    @Override
+    public void onAttach(Activity activity) {
+        super.onAttach(activity);
+
+        // This makes sure that the container activity has implemented
+        // the callback interface. If not, it throws an exception
+        try {
+            mCallback = (OnFeedbackSelectedListener) activity;
+        } catch (ClassCastException e) {
+            throw new ClassCastException(activity.toString()
+                    + " must implement OnFeedbackSelectedListener");
+        }
+    }
+
     public int getShownIndex() {
         return getArguments().getInt("index", 0);
     }
@@ -97,6 +128,8 @@ public class DashboardSentFragment extends ListFragment {
     public void onCreate(Bundle savedInstanceState){
         Log.d(TAG, "onCreate");
         super.onCreate(savedInstanceState);
+        orgUnitFilter= getActivity().getString(R.string.filter_all_org_units_upper);
+        programFilter= getActivity().getString(R.string.filter_all_org_assessments_upper);
     }
 
     @Override
@@ -116,9 +149,72 @@ public class DashboardSentFragment extends ListFragment {
 
         initAdapter();
         initListView();
-
     }
+    private void initFilters() {
+        filterSpinnerProgram = (Spinner) getActivity().findViewById(R.id.filter_program);
+        List<Program> filterProgramList=programList;
+        filterProgramList.add(0, new Program(getActivity().getString(R.string.filter_all_org_assessments_upper)));
 
+        filterSpinnerProgram.setAdapter(new FilterProgramArrayAdapter(this.getActivity().getApplicationContext(), filterProgramList));
+        filterSpinnerProgram.setOnItemSelectedListener(new AdapterView.OnItemSelectedListener() {
+
+            @Override
+            public void onItemSelected(AdapterView<?> parent, View view,
+                                       int position, long id) {
+                Program program = (Program) parent.getItemAtPosition(position);
+                boolean reload = false;
+                if (program.getName().equals(getActivity().getString(R.string.filter_all_org_assessments_upper))) {
+                    if (programFilter != getActivity().getString(R.string.filter_all_org_assessments_upper)) {
+                        programFilter = getActivity().getString(R.string.filter_all_org_assessments_upper);
+                        reload=true;
+                    }
+                } else {
+                    if (programFilter != program.getUid()) {
+                        programFilter = program.getUid();
+                        reload=true;
+                    }
+                }
+                if(reload)
+                    reloadSentSurveys();
+            }
+
+            @Override
+            public void onNothingSelected(AdapterView<?> arg0) {
+
+            }
+        });
+        filterSpinnerOrgUnit = (Spinner) getActivity().findViewById(R.id.filter_orgunit);
+
+        orgUnitList.add(0, new OrgUnit(getActivity().getString(R.string.filter_all_org_units_upper)));
+        filterSpinnerOrgUnit.setAdapter(new FilterOrgUnitArrayAdapter(getActivity().getApplicationContext(), orgUnitList));
+        filterSpinnerOrgUnit.setOnItemSelectedListener(new AdapterView.OnItemSelectedListener() {
+
+            @Override
+            public void onItemSelected(AdapterView<?> parent, View view,
+                                       int position, long id) {
+                OrgUnit orgUnit = (OrgUnit) parent.getItemAtPosition(position);
+                boolean reload = false;
+                if (orgUnit.getName().equals(getActivity().getString(R.string.filter_all_org_units_upper))) {
+                    if (orgUnitFilter != getActivity().getString(R.string.filter_all_org_units_upper)) {
+                        orgUnitFilter = getActivity().getString(R.string.filter_all_org_units_upper);
+                        reload = true;
+                    }
+                } else {
+                    if (orgUnitFilter != orgUnit.getUid()) {
+                        orgUnitFilter = orgUnit.getUid();
+                        reload = true;
+                    }
+                }
+                if (reload)
+                    reloadSentSurveys();
+            }
+
+            @Override
+            public void onNothingSelected(AdapterView<?> arg0) {
+
+            }
+        });
+    }
     @Override
     public void onResume(){
         Log.d(TAG, "onResume");
@@ -145,6 +241,23 @@ public class DashboardSentFragment extends ListFragment {
         Session.setAdapterSent(this.adapter);
     }
 
+    public void setScoreOrder()
+    {
+        orderBy=SCORE_ORDER;
+        reloadSentSurveys();
+    }
+
+    public void setFacilityOrder()
+    {
+        orderBy=FACILITY_ORDER;
+        reloadSentSurveys();
+    }
+
+    public void setDateOrder()
+    {
+        orderBy=DATE_ORDER;
+        reloadSentSurveys();
+    }
     @Override
     public void onListItemClick(ListView l, View v, int position, long id){
         Log.d(TAG, "onListItemClick");
@@ -155,21 +268,24 @@ public class DashboardSentFragment extends ListFragment {
             return;
         }
 
-        //Put selected survey in session
-        Session.setSurvey(surveys.get(position - 1));
-        // Go to SurveyActivity
-        ((DashboardActivity) getActivity()).go(FeedbackActivity.class);
-        getActivity().finish();
+        // call feedbackselected function(and it call surveyfragment)
+
+        mCallback.onFeedbackSelected(surveys.get(position - 1));
     }
 
     @Override
     public void onStop(){
         Log.d(TAG, "onStop");
         unregisterSurveysReceiver();
-        stopMonitor();
         super.onStop();
     }
+    @Override
+    public void onPause(){
+        Log.d(TAG, "onPause");
+        unregisterSurveysReceiver();
 
+        super.onPause();
+    }
     /**
      * Checks if the given position points to a real survey instead of a footer or header of the listview.
      * @param position
@@ -204,55 +320,45 @@ public class DashboardSentFragment extends ListFragment {
         LayoutInflater inflater = LayoutInflater.from(getActivity());
         View header = inflater.inflate(this.adapter.getHeaderLayout(), null, false);
         View footer = inflater.inflate(this.adapter.getFooterLayout(), null, false);
-        CustomTextView title = (CustomTextView) getActivity().findViewById(R.id.titleCompleted);
-        title.setText(adapter.getTitle());
+        header=initFilterOrder(header);
         ListView listView = getListView();
+        listView.setBackgroundColor(getResources().getColor(R.color.feedbackDarkBlue));
         listView.addHeaderView(header);
         listView.addFooterView(footer);
         setListAdapter((BaseAdapter) adapter);
-
-        // Create a ListView-specific touch listener. ListViews are given special treatment because
-        // by default they handle touches for their list items... i.e. they're in charge of drawing
-        // the pressed state (the list selector), handling list item clicks, etc.
-        SwipeDismissListViewTouchListener touchListener =
-                new SwipeDismissListViewTouchListener(
-                        listView,
-                        new SwipeDismissListViewTouchListener.DismissCallbacks() {
-                            @Override
-                            public boolean canDismiss(int position) {
-                                return position>0 && position<=surveys.size();
-                            }
-
-                            @Override
-                            public void onDismiss(ListView listView, int[] reverseSortedPositions) {
-                                for (final int position : reverseSortedPositions) {
-                                    new AlertDialog.Builder(getActivity())
-                                            .setTitle(getActivity().getString(R.string.dialog_title_delete_survey))
-                                            .setMessage(getActivity().getString(R.string.dialog_info_delete_survey))
-                                            .setPositiveButton(android.R.string.yes, new DialogInterface.OnClickListener() {
-                                                public void onClick(DialogInterface arg0, int arg1) {
-                                                    ((Survey)adapter.getItem(position-1)).delete();
-
-                                                    Intent surveysIntent=new Intent(getActivity(), SurveyService.class);
-                                                    surveysIntent.putExtra(SurveyService.SERVICE_METHOD, SurveyService.RELOAD_DASHBOARD_ACTION);
-                                                    getActivity().startService(surveysIntent);
-                                                    reloadSentSurveys();
-                                                    reloadMonitor();
-                                                }
-                                            })
-                                            .setNegativeButton(android.R.string.no, null).create().show();
-                                }
-
-                            }
-                        });
-        listView.setOnTouchListener(touchListener);
-        // Setting this scroll listener is required to ensure that during ListView scrolling,
-        // we don't look for swipes.
-        listView.setOnScrollListener(touchListener.makeScrollListener());
-
         Session.listViewSent = listView;
     }
+    
+    //Adds the clicklistener to the header CustomTextView.
+    private View initFilterOrder(View header) {
 
+        CustomTextView statusctv = (CustomTextView) header.findViewById(R.id.statusHeader);
+
+        statusctv.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                setDateOrder();
+            }
+        });
+        CustomTextView scorectv = (CustomTextView) header.findViewById(R.id.scoreHeader);
+
+        scorectv.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                setScoreOrder();
+            }
+        });
+
+        CustomTextView facilityctv = (CustomTextView) header.findViewById(R.id.idHeader);
+
+        facilityctv.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                setFacilityOrder();
+            }
+        });
+        return header;
+    }
 
     /**
      * Register a survey receiver to load surveys into the listadapter
@@ -262,7 +368,8 @@ public class DashboardSentFragment extends ListFragment {
 
         if (surveyReceiver == null) {
             surveyReceiver = new SurveyReceiver();
-            LocalBroadcastManager.getInstance(getActivity()).registerReceiver(surveyReceiver, new IntentFilter(SurveyService.ALL_SENT_SURVEYS_ACTION));
+            LocalBroadcastManager.getInstance(getActivity()).registerReceiver(surveyReceiver, new IntentFilter(SurveyService.ALL_SENT_OR_COMPLETED_SURVEYS_ACTION));
+            LocalBroadcastManager.getInstance(getActivity()).registerReceiver(surveyReceiver, new IntentFilter(SurveyService.ALL_ORG_UNITS_AND_PROGRAMS_ACTION));
         }
     }
 
@@ -285,88 +392,34 @@ public class DashboardSentFragment extends ListFragment {
         this.surveys.addAll(newListSurveys);
         adapter.setItems(newListSurveys);
         this.adapter.notifyDataSetChanged();
-        if (hasSurveys) {
-            reloadMonitor();
-        }
         setListShown(true);
     }
 
-    private void reloadMonitor() {
-        if (webView == null) {
-            webView = initMonitor();
-        }
-
-        //onPageFinish load data
-        webView.setWebViewClient(new WebViewClient() {
-            @Override
-            public void onPageFinished(WebView view, String url) {
-                super.onPageFinished(view, url);
-                //Add line chart
-                new SentSurveysBuilder(surveysForGraphic, getActivity()).addDataInChart(view);
-
-                //Add pie charts
-                new PieTabGroupBuilder(surveysForGraphic, getActivity()).addDataInChart(view);
-
-
-                //Add table x facility
-                new FacilityTableBuilder(surveysForGraphic, getActivity()).addDataInChart(view);
-
-                // As WebView and ListView doesn't get on well, we need to calculate ListViews height
-                // after WebView is loaded to be able to properly represent it in the screen
-                LayoutUtils.setListViewHeightBasedOnChildren(Session.listViewSent);
-                LayoutUtils.setListViewHeightBasedOnChildren(Session.listViewUnsent);
-            }
-        });
-
-        //Load html
-        webView.loadUrl("file:///android_asset/dashboard/dashboard.html");
-    }
-
-    private WebView initMonitor() {
-        WebView webView = (WebView) getActivity().findViewById(R.id.dashboard_monitor);
-        //Init webView settings
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.JELLY_BEAN) {
-            webView.getSettings().setAllowUniversalAccessFromFileURLs(true);
-            webView.getSettings().setAllowFileAccessFromFileURLs(true);
-        }
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.KITKAT) {
-            WebView.setWebContentsDebuggingEnabled(true);
-        }
-        webView.getSettings().setJavaScriptEnabled(true);
-
-        return webView;
-    }
-
-    /**
-     * Stops webView gracefully
-     */
-    private void stopMonitor(){
-        try{
-            if(webView!=null){
-                webView.stopLoading();
-            }
-        }catch(Exception e){
-            e.printStackTrace();
-        }
+    public void reloadData(){
+        //Reload data using service
+        Intent surveysIntent=new Intent(PreferencesState.getInstance().getContext().getApplicationContext(), SurveyService.class);
+        surveysIntent.putExtra(SurveyService.SERVICE_METHOD, SurveyService.RELOAD_DASHBOARD_ACTION);
+        PreferencesState.getInstance().getContext().getApplicationContext().startService(surveysIntent);
     }
 
     /**
      * filter the surveys for last survey in org unit, and set surveysForGraphic for the statistics
      */
     public void reloadSentSurveys() {
-        surveysForGraphic = (List<Survey>) Session.popServiceValue(SurveyService.ALL_SENT_SURVEYS_ACTION);
+        List<Survey> surveys = (List<Survey>) Session.popServiceValue(SurveyService.ALL_SENT_OR_COMPLETED_SURVEYS_ACTION);
         HashMap<String, Survey> orgUnits;
         orgUnits = new HashMap<>();
         oneSurveyForOrgUnit = new ArrayList<>();
-        for (Survey survey : surveysForGraphic) {
-            if (survey.isSent()) {
+
+        for (Survey survey : surveys) {
+            if (survey.isSent() || survey.isCompleted()) {
                 if (survey.getOrgUnit() != null) {
                     if (!orgUnits.containsKey(survey.getTabGroup().getProgram().getUid()+survey.getOrgUnit().getUid())) {
-                        orgUnits.put(survey.getTabGroup().getProgram().getUid()+survey.getOrgUnit().getUid(), survey);
+                        filterSurvey(orgUnits, survey);
                     } else {
                         Survey surveyMapped = orgUnits.get(survey.getTabGroup().getProgram().getUid()+survey.getOrgUnit().getUid());
                         if (surveyMapped.getCompletionDate().before(survey.getCompletionDate())) {
-                            orgUnits.put(survey.getTabGroup().getProgram().getUid()+survey.getOrgUnit().getUid(), survey);
+                            orgUnits=filterSurvey(orgUnits, survey);
                         }
                     }
                 }
@@ -375,7 +428,59 @@ public class DashboardSentFragment extends ListFragment {
         for (Survey survey : orgUnits.values()) {
             oneSurveyForOrgUnit.add(survey);
         }
+        //Order the surveys, and reverse if is needed, taking the last order from LAST_ORDER
+        if (orderBy != WITHOUT_ORDER) {
+            reverse=false;
+            if(orderBy==LAST_ORDER){
+                reverse=true;
+            }
+            Collections.sort(oneSurveyForOrgUnit, new Comparator<Survey>() {
+                public int compare(Survey survey1, Survey survey2) {
+                    int compare;
+                    switch (orderBy) {
+                        case FACILITY_ORDER:
+                            String surveyA = survey1.getOrgUnit().getName();
+                            String surveyB = survey2.getOrgUnit().getName();
+                            compare = surveyA.compareTo(surveyB);
+                            break;
+                        case DATE_ORDER:
+                            compare = survey1.getCompletionDate().compareTo(survey2.getCompletionDate());
+                            break;
+                        case SCORE_ORDER:
+                            compare = survey1.getMainScore().compareTo(survey2.getMainScore());
+                            break;
+                        default:
+                            compare = survey1.getMainScore().compareTo(survey2.getMainScore());
+                            break;
+                    }
+
+                    if (reverse) {
+                        return (compare * -1);
+                    }
+                    return compare;
+                }
+            });
+        }
+        if (reverse) {
+            LAST_ORDER=WITHOUT_ORDER;
+        }
+        else{
+            LAST_ORDER=orderBy;
+        }
         reloadSurveys(oneSurveyForOrgUnit);
+    }
+
+    public void getOrgUnitAndProgram(){
+        HashMap<String,List> data=(HashMap) Session.popServiceValue(SurveyService.ALL_ORG_UNITS_AND_PROGRAMS_ACTION);
+        orgUnitList=data.get(SurveyService.PREPARE_ORG_UNIT);
+        programList=data.get(SurveyService.PREPARE_PROGRAMS);
+    }
+
+    private HashMap<String, Survey> filterSurvey(HashMap<String, Survey> orgUnits, Survey survey) {
+        if(orgUnitFilter.equals(getActivity().getString(R.string.filter_all_org_units_upper)) || orgUnitFilter.equals(survey.getOrgUnit().getUid()))
+            if(programFilter.equals(getActivity().getString(R.string.filter_all_org_assessments_upper)) || programFilter.equals(survey.getTabGroup().getProgram().getUid()))
+              orgUnits.put(survey.getTabGroup().getProgram().getUid()+survey.getOrgUnit().getUid(), survey);
+        return orgUnits;
     }
 
     /**
@@ -389,10 +494,13 @@ public class DashboardSentFragment extends ListFragment {
         public void onReceive(Context context, Intent intent) {
             Log.d(TAG, "onReceive");
             //Listening only intents from this method
-            if (SurveyService.ALL_SENT_SURVEYS_ACTION.equals(intent.getAction())) {
+            if (SurveyService.ALL_SENT_OR_COMPLETED_SURVEYS_ACTION.equals(intent.getAction())) {
                 reloadSentSurveys();
             }
+            if(SurveyService.ALL_ORG_UNITS_AND_PROGRAMS_ACTION.equals(intent.getAction())){
+                getOrgUnitAndProgram();
+                initFilters();
+            }
         }
-
     }
 }

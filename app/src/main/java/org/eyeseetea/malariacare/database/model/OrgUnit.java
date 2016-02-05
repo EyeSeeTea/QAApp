@@ -33,6 +33,7 @@ import org.eyeseetea.malariacare.database.AppDatabase;
 import org.eyeseetea.malariacare.database.iomodules.dhis.exporter.IConvertToSDKVisitor;
 import org.eyeseetea.malariacare.database.iomodules.dhis.exporter.VisitableToSDK;
 
+import java.util.ArrayList;
 import java.util.List;
 
 @Table(databaseName = AppDatabase.NAME)
@@ -47,6 +48,8 @@ public class OrgUnit extends BaseModel {
     String name;
     @Column
     Long id_parent;
+    @Column
+    Integer productivity;
 
     /**
      * Refernce to parent orgUnit (loaded lazily)
@@ -71,17 +74,23 @@ public class OrgUnit extends BaseModel {
      */
     List<OrgUnit> children;
 
+    /**
+     * List of program authorized for this orgunit
+     */
+    List<Program> programs;
+
     public OrgUnit() {
     }
 
     public OrgUnit(String name) {
+        this();
         this.name = name;
     }
 
 
     public OrgUnit(String uid, String name, OrgUnit orgUnit, OrgUnitLevel orgUnitLevel) {
+        this(name);
         this.uid = uid;
-        this.name = name;
         this.setOrgUnit(orgUnit);
         this.setOrgUnitLevel(orgUnitLevel);
     }
@@ -168,6 +177,65 @@ public class OrgUnit extends BaseModel {
         return surveys;
     }
 
+    public List<Program> getPrograms(){
+        if(programs==null){
+            List<OrgUnitProgramRelation> orgUnitProgramRelations = new Select().from(OrgUnitProgramRelation.class)
+                    .where(Condition.column(OrgUnitProgramRelation$Table.ID_ORG_UNIT).eq(this.getId_org_unit()))
+                    .queryList();
+            this.programs= new ArrayList<>();
+            for(OrgUnitProgramRelation programRelation:orgUnitProgramRelations){
+                programs.add(programRelation.getProgram());
+            }
+        }
+        return programs;
+    }
+
+    public static List<OrgUnit> getAllOrgUnit() {
+        return new Select().all().from(OrgUnit.class).queryList();
+    }
+
+    public void addProgram(Program program){
+        //Null -> nothing
+        if(program==null){
+            return;
+        }
+
+        //Save a new relationship
+        OrgUnitProgramRelation orgUnitProgramRelation = new OrgUnitProgramRelation(this,program);
+        orgUnitProgramRelation.save();
+
+        //Clear cache to enable reloading
+        programs=null;
+    }
+
+    public Integer getProductivity(){
+        return productivity;
+    }
+
+    public void setProductivity(Integer productivity){
+        this.productivity=productivity;
+    }
+
+    public boolean isLowProductivity(){
+        return productivity<5;
+    }
+
+    /**
+     * Returns all orgunits
+     * @return
+     */
+    public static List<OrgUnit> list(){
+        return new Select().from(OrgUnit.class).queryList();
+    }
+
+    public static OrgUnit getOrgUnit(String uid) {
+            OrgUnit orgUnit = new Select()
+                    .from(OrgUnit.class)
+                    .where(Condition.column(OrgUnit$Table.UID)
+                            .is(uid)).querySingle();
+        return orgUnit;
+    }
+
     @Override
     public boolean equals(Object o) {
         if (this == o) return true;
@@ -178,6 +246,7 @@ public class OrgUnit extends BaseModel {
         if (id_org_unit != orgUnit.id_org_unit) return false;
         if (uid != null ? !uid.equals(orgUnit.uid) : orgUnit.uid != null) return false;
         if (name != null ? !name.equals(orgUnit.name) : orgUnit.name != null) return false;
+        if (productivity != null ? !productivity.equals(orgUnit.productivity) : orgUnit.productivity != null) return false;
         if (id_parent != null ? !id_parent.equals(orgUnit.id_parent) : orgUnit.id_parent != null)
             return false;
         return !(id_org_unit_level != null ? !id_org_unit_level.equals(orgUnit.id_org_unit_level) : orgUnit.id_org_unit_level != null);
@@ -190,6 +259,7 @@ public class OrgUnit extends BaseModel {
         result = 31 * result + (uid != null ? uid.hashCode() : 0);
         result = 31 * result + (name != null ? name.hashCode() : 0);
         result = 31 * result + (id_parent != null ? id_parent.hashCode() : 0);
+        result = 31 * result + (productivity != null ? productivity.hashCode() : 0);
         result = 31 * result + (id_org_unit_level != null ? id_org_unit_level.hashCode() : 0);
         return result;
     }
@@ -202,6 +272,7 @@ public class OrgUnit extends BaseModel {
                 ", name='" + name + '\'' +
                 ", id_parent=" + id_parent +
                 ", id_org_unit_level=" + id_org_unit_level +
+                ", productivity=" + productivity +
                 '}';
     }
 }

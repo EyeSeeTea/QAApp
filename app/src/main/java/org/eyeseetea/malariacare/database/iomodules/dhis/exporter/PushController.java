@@ -27,14 +27,21 @@ import com.squareup.otto.Subscribe;
 
 import org.eyeseetea.malariacare.R;
 import org.eyeseetea.malariacare.database.iomodules.dhis.importer.SyncProgressStatus;
+import org.eyeseetea.malariacare.database.iomodules.dhis.importer.models.EventExtended;
 import org.eyeseetea.malariacare.database.model.Survey;
+import org.eyeseetea.malariacare.database.utils.planning.SurveyPlanner;
 import org.hisp.dhis.android.sdk.controllers.DhisService;
 import org.hisp.dhis.android.sdk.job.NetworkJob;
+import org.hisp.dhis.android.sdk.network.ResponseHolder;
 import org.hisp.dhis.android.sdk.persistence.Dhis2Application;
+import org.hisp.dhis.android.sdk.persistence.models.ImportSummary;
+import org.hisp.dhis.android.sdk.persistence.models.Event;
 import org.hisp.dhis.android.sdk.persistence.preferences.ResourceType;
 
 
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 
 /**
  * A static controller that orchestrate the push process
@@ -90,20 +97,25 @@ public class PushController {
      *  - Turns SDK into APP data
      * @param ctx
      */
-    public void push(Context ctx,List<Survey> surveys){
+    public boolean push(Context ctx,List<Survey> surveys){
         Log.d(TAG, "Starting PUSH process...");
         context=ctx;
 
         //No survey no push
         if(surveys==null || surveys.size()==0){
             postException(new Exception(context.getString(R.string.progress_push_no_survey)));
-            return;
+            return false;
+        }
+
+        //Register for event bus
+        try {
+            register();
+        }catch(Exception e){
+            unregister();
+            register();
         }
 
         try {
-            //Register for event bus
-            register();
-
             //Converts app data into sdk events
             postProgress(context.getString(R.string.progress_push_preparing_survey));
             Log.d(TAG, "Preparing survey for pushing...");
@@ -112,17 +124,19 @@ public class PushController {
             //Asks sdk to push localdata
             postProgress(context.getString(R.string.progress_push_posting_survey));
             Log.d(TAG, "Pushing survey data to server...");
-            DhisService.sendData();
-
-        }catch (Exception ex){
-            Log.e(TAG,"push: "+ex.getLocalizedMessage());
+            DhisService.sendEventChanges();
+            saveCreationDateInSDK(surveys);
+        }catch (Exception ex) {
+            Log.e(TAG, "push: " + ex.getLocalizedMessage());
             unregister();
             postException(ex);
+            return false;
         }
+        return true;
     }
 
     @Subscribe
-    public void onSendDataFinished(final NetworkJob.NetworkJobResult<ResourceType> result) {
+    public void onSendDataFinished(final NetworkJob.NetworkJobResult<Map<Long,ImportSummary>> result) {
         new Thread(){
             @Override
             public void run(){
@@ -141,7 +155,7 @@ public class PushController {
                     //Ok: Updates
                     postProgress(context.getString(R.string.progress_push_updating_survey));
                     Log.d(TAG, "Updating pushed survey data...");
-                    converter.saveSurveyStatus();
+                    converter.saveSurveyStatus(getImportSummaryMap(result));
                     Log.d(TAG, "PUSH process...OK");
                 }catch (Exception ex){
                     Log.e(TAG,"onSendDataFinished: "+ex.getLocalizedMessage());
@@ -165,6 +179,42 @@ public class PushController {
         }
     }
 
+    /**
+     * Gets full importSummary for every Event that has been pushed to the server
+     * @param result
+     * @return
+     */
+    private Map<Long,ImportSummary> getImportSummaryMap(NetworkJob.NetworkJobResult<Map<Long,ImportSummary>> result){
+        Map<Long,ImportSummary> emptyImportSummaryMap=new HashMap<>();
+        //No result -> no details
+        if(result==null){
+            return emptyImportSummaryMap;
+        }
+
+        //General exception -> no details
+        if (result.getResponseHolder() != null && result.getResponseHolder().getApiException() != null) {
+            return emptyImportSummaryMap;
+        }
+
+        ResponseHolder<Map<Long,ImportSummary>> responseHolder=result.getResponseHolder();
+        if(responseHolder==null || responseHolder.getItem()==null){
+            return emptyImportSummaryMap;
+        }
+
+        return responseHolder.getItem();
+    }
+
+    private void saveCreationDateInSDK(List<Survey> surveys) {
+        Log.d(TAG,"Saving complete date");
+        //TODO is necesary check if the event was successfully uploaded before do this. It will be doing in sdk 2.21
+        for(Survey survey:surveys){
+            for(int i=0;i<converter.events.size();i++){
+                if(survey.getEventUid().equals(converter.events.get(i).getUid())) {
+                    converter.events.get(i).setCreated(EventExtended.format(survey.getCompletionDate()));
+                }
+            }
+        }
+    }
     /**
      * Notifies a progress into the bus (the caller activity will be listening)
      * @param msg
