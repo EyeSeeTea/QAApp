@@ -21,13 +21,14 @@ package org.eyeseetea.malariacare.database.iomodules.dhis.importer;
 
 import android.util.Log;
 
-import org.eyeseetea.malariacare.R;
+import org.eyeseetea.malariacare.ProgressActivity;
 import org.eyeseetea.malariacare.database.iomodules.dhis.importer.models.DataElementExtended;
 import org.eyeseetea.malariacare.database.iomodules.dhis.importer.models.DataValueExtended;
 import org.eyeseetea.malariacare.database.iomodules.dhis.importer.models.EventExtended;
 import org.eyeseetea.malariacare.database.iomodules.dhis.importer.models.OptionExtended;
 import org.eyeseetea.malariacare.database.iomodules.dhis.importer.models.OptionSetExtended;
 import org.eyeseetea.malariacare.database.iomodules.dhis.importer.models.OrganisationUnitExtended;
+import org.eyeseetea.malariacare.database.iomodules.dhis.importer.models.OrganisationUnitLevelExtended;
 import org.eyeseetea.malariacare.database.iomodules.dhis.importer.models.ProgramExtended;
 import org.eyeseetea.malariacare.database.iomodules.dhis.importer.models.ProgramStageExtended;
 import org.eyeseetea.malariacare.database.iomodules.dhis.importer.models.ProgramStageSectionExtended;
@@ -35,6 +36,8 @@ import org.eyeseetea.malariacare.database.iomodules.dhis.importer.models.UserAcc
 import org.eyeseetea.malariacare.database.model.Answer;
 import org.eyeseetea.malariacare.database.model.CompositeScore;
 import org.eyeseetea.malariacare.database.model.OrgUnit;
+import org.eyeseetea.malariacare.database.model.OrgUnitLevel;
+import org.eyeseetea.malariacare.database.model.OrgUnitProgramRelation;
 import org.eyeseetea.malariacare.database.model.Question;
 import org.eyeseetea.malariacare.database.model.Score;
 import org.eyeseetea.malariacare.database.model.Survey;
@@ -42,17 +45,15 @@ import org.eyeseetea.malariacare.database.model.Tab;
 import org.eyeseetea.malariacare.database.model.TabGroup;
 import org.eyeseetea.malariacare.database.model.User;
 import org.eyeseetea.malariacare.database.model.Value;
-import org.eyeseetea.malariacare.database.utils.PreferencesState;
 import org.eyeseetea.malariacare.utils.Constants;
 import org.hisp.dhis.android.sdk.controllers.metadata.MetaDataController;
-import org.hisp.dhis.android.sdk.persistence.models.Attribute;
 import org.hisp.dhis.android.sdk.persistence.models.DataElement;
 import org.hisp.dhis.android.sdk.persistence.models.DataValue;
 import org.hisp.dhis.android.sdk.persistence.models.Event;
 import org.hisp.dhis.android.sdk.persistence.models.Option;
 import org.hisp.dhis.android.sdk.persistence.models.OptionSet;
 import org.hisp.dhis.android.sdk.persistence.models.OrganisationUnit;
-import org.hisp.dhis.android.sdk.persistence.models.OrganisationUnitAttributeValue;
+import org.hisp.dhis.android.sdk.persistence.models.OrganisationUnitLevel;
 import org.hisp.dhis.android.sdk.persistence.models.Program;
 import org.hisp.dhis.android.sdk.persistence.models.ProgramStage;
 import org.hisp.dhis.android.sdk.persistence.models.ProgramStageDataElement;
@@ -61,6 +62,7 @@ import org.hisp.dhis.android.sdk.persistence.models.UserAccount;
 import org.hisp.dhis.android.sdk.utils.api.ProgramType;
 
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 
 public class ConvertFromSDKVisitor implements IConvertFromSDKVisitor {
@@ -80,6 +82,9 @@ public class ConvertFromSDKVisitor implements IConvertFromSDKVisitor {
         appMapObjects = new HashMap();
         compositeScoreBuilder = new CompositeScoreBuilder();
         questionBuilder = new QuestionBuilder();
+
+        //Reload static dataElement codes
+        DataElementExtended.reloadDataElementTypeCodes();
     }
 
     /**
@@ -130,6 +135,21 @@ public class ConvertFromSDKVisitor implements IConvertFromSDKVisitor {
     }
 
     /**
+     * Turns a sdk level into an app level
+     * @param sdkOrganisationUnitLevelExtended
+     */
+    @Override
+    public void visit(OrganisationUnitLevelExtended sdkOrganisationUnitLevelExtended){
+        OrganisationUnitLevel organisationUnitLevel = sdkOrganisationUnitLevelExtended.getOrganisationUnitLevel();
+        OrgUnitLevel orgUnitLevel = new OrgUnitLevel();
+        orgUnitLevel.setUid(organisationUnitLevel.getId());
+        orgUnitLevel.setName(organisationUnitLevel.getDisplayName());
+        orgUnitLevel.save();
+
+        appMapObjects.put(sdkOrganisationUnitLevelExtended.buildKey(),orgUnitLevel);
+    }
+
+    /**
      * Turns a sdk organisationUnit into an app OrgUnit
      *
      * @param sdkOrganisationUnitExtended
@@ -138,12 +158,7 @@ public class ConvertFromSDKVisitor implements IConvertFromSDKVisitor {
     public void visit(OrganisationUnitExtended sdkOrganisationUnitExtended) {
         //Create and save OrgUnitLevel
         OrganisationUnit organisationUnit=sdkOrganisationUnitExtended.getOrgUnit();
-        org.eyeseetea.malariacare.database.model.OrgUnitLevel orgUnitLevel = new org.eyeseetea.malariacare.database.model.OrgUnitLevel();
-        if(!appMapObjects.containsKey(String.valueOf(organisationUnit.getLevel()))) {
-            orgUnitLevel.setName(PreferencesState.getInstance().getContext().getResources().getString(R.string.create_info_zone));
-            orgUnitLevel.save();
-            appMapObjects.put(String.valueOf(organisationUnit.getLevel()), orgUnitLevel);
-        }
+        OrgUnitLevel appOrgUnitLevel = (OrgUnitLevel)appMapObjects.get(OrganisationUnitLevelExtended.buildKey(organisationUnit.getLevel()));
         //create the orgUnit
         org.eyeseetea.malariacare.database.model.OrgUnit appOrgUnit= new org.eyeseetea.malariacare.database.model.OrgUnit();
         //Set name
@@ -151,32 +166,17 @@ public class ConvertFromSDKVisitor implements IConvertFromSDKVisitor {
         //Set uid
         appOrgUnit.setUid(organisationUnit.getId());
         //Set orgUnitLevel
-        appOrgUnit.setOrgUnitLevel((org.eyeseetea.malariacare.database.model.OrgUnitLevel) appMapObjects.get(String.valueOf(organisationUnit.getLevel())));
-        //Set default productivity
-        appOrgUnit.setProductivity(0);
-        //if exist in the server set productivity
-        for(OrganisationUnitAttributeValue organisationUnitAttributeValue:organisationUnit.getAttributeValues())
-        {
-            Attribute attribute= MetaDataController.getAttribute(organisationUnitAttributeValue.getAttributeId());
-            if(attribute.getCode().equals(ATTRIBUTE_PRODUCTIVITY_CODE)) {
-                appOrgUnit.setProductivity(Integer.parseInt(organisationUnitAttributeValue.getValue()));
-            }
-        }
-        //Set the parent
-        //At this moment, the parent is a UID of a not pulled Org_unit , without the full org_unit the OrgUnit.orgUnit(parent) is null.
-        String parent_id=null;
-        parent_id = organisationUnit.getParent();
-        if(parent_id!=null && !parent_id.equals("")) {
-            appOrgUnit.setOrgUnit((org.eyeseetea.malariacare.database.model.OrgUnit) appMapObjects.get(String.valueOf(parent_id)));
-        }
-        else
-            appOrgUnit.setOrgUnit((OrgUnit)null);
+        appOrgUnit.setOrgUnitLevel(appOrgUnitLevel);
+        //Since there is no guaranteed order in orgunits parent unit might not be yet converted or even pulled at all
+        //Thus building hierarchy must be done in a second step
+
         appOrgUnit.save();
         //Annotate built orgunit
         appMapObjects.put(organisationUnit.getId(), appOrgUnit);
 
         //Associate programs
-        buildOrgUnitProgramRelationships(appOrgUnit);
+        sdkOrganisationUnitExtended.setAppOrgUnit(appOrgUnit);
+        buildOrgUnitProgramRelation(sdkOrganisationUnitExtended);
     }
 
     /**
@@ -261,7 +261,7 @@ public class ConvertFromSDKVisitor implements IConvertFromSDKVisitor {
     @Override
     public void visit(DataElementExtended sdkDataElementExtended) {
         Object questionOrCompositeScore;
-        if(compositeScoreBuilder.isACompositeScore(sdkDataElementExtended)){
+        if(sdkDataElementExtended.isCompositeScore()){
             questionOrCompositeScore=buildCompositeScore(sdkDataElementExtended);
         }else if(sdkDataElementExtended.isQuestion()){
             questionOrCompositeScore=buildQuestion(sdkDataElementExtended);
@@ -432,20 +432,78 @@ public class ConvertFromSDKVisitor implements IConvertFromSDKVisitor {
     }
 
     /**
-     * Due to permissions programs 'belongs' to a given orgunit
+     * Due to permissions programs 'belongs' to a given orgunit and that relationship has a productivity
+     * @param sdkOrganisationUnitExtended Extended sdk orgUnit (used to cache array with values)
      */
-    public void buildOrgUnitProgramRelationships(OrgUnit appOrgUnit){
-        Log.d(TAG,"buildOrgUnitProgramRelationships "+appOrgUnit.getName());
+    public void buildOrgUnitProgramRelation(OrganisationUnitExtended sdkOrganisationUnitExtended) {
+        OrgUnit appOrgUnit = sdkOrganisationUnitExtended.getAppOrgUnit();
+        Log.d(TAG, "buildOrgUnitProgramRelation " + appOrgUnit.getName());
         //Each assigned program
         for (org.hisp.dhis.android.sdk.persistence.models.Program program : MetaDataController.getProgramsForOrganisationUnit(appOrgUnit.getUid(), ProgramType.WITHOUT_REGISTRATION)) {
-            org.eyeseetea.malariacare.database.model.Program appProgram = (org.eyeseetea.malariacare.database.model.Program) appMapObjects.get(program.getUid());
-            appProgram.addOrgUnit(appOrgUnit);
+            ProgramExtended sdkProgramExtended = new ProgramExtended(program);
+            sdkProgramExtended.setAppProgram((org.eyeseetea.malariacare.database.model.Program) appMapObjects.get(program.getUid()));
+
+            addOrgUnitProgramRelation(sdkOrganisationUnitExtended,sdkProgramExtended);
         }
+    }
+
+    /**
+     * Updates the relationship between the given orgUnit and program according to their attribute values
+     * @param sdkOrganisationUnitExtended
+     * @param sdkProgramExtended
+     */
+    private void addOrgUnitProgramRelation(OrganisationUnitExtended sdkOrganisationUnitExtended, ProgramExtended sdkProgramExtended){
+        //Take app references
+        OrgUnit appOrgUnit=sdkOrganisationUnitExtended.getAppOrgUnit();
+        org.eyeseetea.malariacare.database.model.Program appProgram=sdkProgramExtended.getAppProgram();
+
+        //Add relationship
+        OrgUnitProgramRelation orgUnitProgramRelation=appProgram.addOrgUnit(appOrgUnit);
+
+        //Add productivity to that relationship
+        Integer productivityIndex=sdkProgramExtended.getProductivityPosition();
+        Integer orgUnitProgramRelationProductivity = sdkOrganisationUnitExtended.getProductivity(productivityIndex);
+        orgUnitProgramRelation.setProductivity(orgUnitProgramRelationProductivity);
+        orgUnitProgramRelation.save();
     }
 
     @Override
     public void buildScores() {
         compositeScoreBuilder.buildScores();
+    }
+
+    /**
+     * Builds the orgunit hierarchy whenever is possible
+     * @param assignedOrganisationsUnits
+     * @return
+     */
+    public boolean buildOrgUnitHierarchy(List<OrganisationUnit> assignedOrganisationsUnits) {
+
+        for(OrganisationUnit organisationUnit:assignedOrganisationsUnits){
+            if(!ProgressActivity.PULL_IS_ACTIVE) return false;
+
+            OrgUnit appOrgUnit = (OrgUnit)appMapObjects.get(organisationUnit.getId());
+            String parentUID=organisationUnit.getParent();
+            //No parent nothing to do
+            if(parentUID==null){
+                Log.i(TAG,String.format("%s is a root orgUnit",appOrgUnit.getName()));
+                continue;
+            }
+
+            //Find parent
+            OrgUnit parentOrgUnit = (OrgUnit) appMapObjects.get(parentUID);
+
+            //Due to server permissions parent unit might not be loaded
+            if(parentOrgUnit==null){
+                Log.w(TAG,String.format("Cannot find parent orgunit for %s",appOrgUnit.getName()));
+                continue;
+            }
+
+            appOrgUnit.setOrgUnit(appOrgUnit.getId_org_unit());
+            appOrgUnit.save();
+        }
+        return true;
+
     }
 
 }

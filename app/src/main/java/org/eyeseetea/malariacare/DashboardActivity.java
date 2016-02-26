@@ -19,6 +19,7 @@
 
 package org.eyeseetea.malariacare;
 
+import android.app.ActionBar;
 import android.app.Activity;
 import android.app.AlertDialog;
 import android.app.Fragment;
@@ -29,14 +30,20 @@ import android.content.Intent;
 import android.content.SharedPreferences;
 import android.graphics.drawable.Drawable;
 import android.os.Bundle;
+import android.os.Handler;
+import android.os.Looper;
 import android.preference.PreferenceManager;
 import android.support.annotation.NonNull;
+import android.text.Html;
+import android.text.Spanned;
 import android.util.Log;
 import android.view.Menu;
 import android.view.MenuItem;
 import android.view.View;
+import android.widget.ImageView;
 import android.widget.LinearLayout;
 import android.widget.TabHost;
+import android.widget.TabWidget;
 import android.widget.TextView;
 
 import com.squareup.otto.Subscribe;
@@ -45,6 +52,7 @@ import com.squareup.otto.Subscribe;
 import org.eyeseetea.malariacare.database.model.Program;
 import org.eyeseetea.malariacare.database.model.Survey;
 import org.eyeseetea.malariacare.database.model.User;
+import org.eyeseetea.malariacare.database.utils.PreferencesState;
 import org.eyeseetea.malariacare.database.utils.Session;
 import org.eyeseetea.malariacare.database.utils.SurveyAnsweredRatio;
 import org.eyeseetea.malariacare.fragments.CreateSurveyFragment;
@@ -78,11 +86,15 @@ public class DashboardActivity extends BaseActivity implements DashboardUnsentFr
     String currentTab;
     String currentTabName;
     boolean isMoveToLeft;
+    static Handler handler;
+    static Activity dashboardActivity;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         Log.d(TAG, "onCreate");
         super.onCreate(savedInstanceState);
+        handler = new Handler(Looper.getMainLooper());
+        dashboardActivity=this;
         setContentView(R.layout.tab_dashboard);
         try {
             initDataIfRequired();
@@ -175,35 +187,41 @@ public class DashboardActivity extends BaseActivity implements DashboardUnsentFr
 
     public void setActionBarDashboard(){
         String title="";
+        String user="";
         if(Session.getUser()!=null && Session.getUser().getName()!=null)
-            title=Session.getUser().getName().toUpperCase();
-        title=title+": "+currentTabName.toUpperCase();
-        setActionbarMultiTitle("",title,"");
+            user=Session.getUser().getName();
+
+        //Capitalize tab name
+        StringBuilder tabtemp = new StringBuilder(currentTabName.toLowerCase());
+        tabtemp.setCharAt(0, Character.toUpperCase(tabtemp.charAt(0)));
+        title = tabtemp.toString();
+        int appNameColor = getResources().getColor(R.color.appNameColor);
+        String appNameColorString = String.format("%X", appNameColor).substring(2);
+        Spanned spannedTitle=Html.fromHtml(String.format("<font color=\"#%s\"><b>", appNameColorString)+getResources().getString(R.string.app_name)+ "</b></font> | "+ title);
+        setActionbarTitle(spannedTitle, user);
     }
 
     public void setActionBarTitleForSurvey(Survey survey){
         String title="";
         String subtitle="";
-        String subtitle2="";
-        if(Session.getUser()!=null && Session.getUser().getName()!=null)
-            title=Session.getUser().getName().toUpperCase();
-        title=title+": "+currentTabName.toUpperCase();
-
+        int appNameColor = getResources().getColor(R.color.appNameColor);
+        String appNameColorString = String.format("%X", appNameColor).substring(2);
         Program program = survey.getTabGroup().getProgram();
         if(survey.getOrgUnit().getName()!=null)
-            subtitle=survey.getOrgUnit().getName();
+            title=survey.getOrgUnit().getName();
         if(program.getName()!=null)
-            subtitle2=program.getName();
-        setActionbarMultiTitle(title, subtitle, subtitle2);
+            subtitle=program.getName();
+        Spanned spannedTitle=Html.fromHtml(String.format("<font color=\"#%s\"><b>", appNameColorString)+title+"</b></font>");
+        setActionbarTitle(spannedTitle, subtitle);
     }
 
-    public void setActionbarMultiTitle(String title1, String title2,String title3) {
+    public void setActionbarTitle(Spanned title, String subtitle) {
         android.support.v7.app.ActionBar actionBar = getSupportActionBar();
         actionBar.setDisplayShowCustomEnabled(true);
-        actionBar.setCustomView(R.layout.action_bar_three_title_layout);
-        ((TextView) findViewById(R.id.action_bar_multititle_title)).setText(title1);
-        ((TextView) findViewById(R.id.action_bar_multititle_subtitle)).setText(title2);
-        ((TextView) findViewById(R.id.action_bar_multititle_subtitle2)).setText(title3);
+        actionBar.setDisplayHomeAsUpEnabled(true);
+        actionBar.setCustomView(R.layout.custom_action_bar);
+        ((TextView) findViewById(R.id.action_bar_multititle_title)).setText(title);
+        ((TextView) findViewById(R.id.action_bar_multititle_subtitle)).setText(subtitle);
     }
 
     /**
@@ -217,16 +235,25 @@ public class DashboardActivity extends BaseActivity implements DashboardUnsentFr
 
     /**
      * Set tab in tabHost
-     * @param tab_plan is the name of the tab
+     * @param tabName is the name of the tab
      * @param layout is the id of the layout
      * @param image is the drawable with the tab icon image
      */
-    private void setTab(String tab_plan, int layout,  Drawable image) {
-        TabHost.TabSpec tab = tabHost.newTabSpec(tab_plan);
+    private void setTab(String tabName, int layout,  Drawable image) {
+        TabHost.TabSpec tab = tabHost.newTabSpec(tabName);
         tab.setContent(layout);
         tab.setIndicator("", image);
         tabHost.addTab(tab);
+        addTagToLastTab(tabName);
+    }
 
+    private void addTagToLastTab(String tabName){
+        TabWidget tabWidget=tabHost.getTabWidget();
+        int numTabs=tabWidget.getTabCount();
+        LinearLayout tabIndicator=(LinearLayout)tabWidget.getChildTabViewAt(numTabs - 1);
+
+        ImageView imageView = (ImageView)tabIndicator.getChildAt(0);
+        imageView.setTag(tabName);
     }
 
     public void initPlanned(){
@@ -351,6 +378,9 @@ public class DashboardActivity extends BaseActivity implements DashboardUnsentFr
     @Override
     public boolean onOptionsItemSelected(MenuItem item) {
 
+        if(item.getItemId()==android.R.id.home){
+            getFragmentManager().popBackStack();
+        }
         //Any common option
         if(item.getItemId()!=R.id.action_pull){
             return super.onOptionsItemSelected(item);
@@ -412,6 +442,7 @@ public class DashboardActivity extends BaseActivity implements DashboardUnsentFr
     }
 
     private void pullMetadata(){
+        PreferencesState.getInstance().clearOrgUnitPreference();
         finishAndGo(ProgressActivity.class);
     }
 
@@ -525,7 +556,7 @@ public class DashboardActivity extends BaseActivity implements DashboardUnsentFr
                 .setTitle(R.string.survey_title_exit)
                 .setMessage(R.string.survey_info_exit).setPositiveButton(android.R.string.yes, new DialogInterface.OnClickListener() {
             public void onClick(DialogInterface dialog, int arg1) {
-                Survey survey=Session.getSurvey();
+                Survey survey = Session.getSurvey();
                 survey.updateSurveyStatus();
                 closeSurveyFragment();
             }
@@ -708,5 +739,33 @@ public class DashboardActivity extends BaseActivity implements DashboardUnsentFr
      */
     public void setAlarm() {
         AlarmPushReceiver.getInstance().setPushAlarm(this);
+    }
+
+
+
+    //Show dialog exception from class without activity.
+    public static void showException(final String title, final String errorMessage) {
+        handler.postDelayed(new Runnable() {
+            @Override
+            public void run() {
+                // Run your task here
+                new Handler(Looper.getMainLooper()).post(new Runnable() {
+                    @Override
+                    public void run() {
+                        String dialogTitle = "", dialogMessage = "";
+                        if (title != null)
+                            dialogTitle = title;
+                        if (errorMessage != null)
+                            dialogMessage = errorMessage;
+                        new AlertDialog.Builder(dashboardActivity)
+                                .setCancelable(false)
+                                .setTitle(dialogTitle)
+                                .setMessage(dialogMessage)
+                                .setNeutralButton(android.R.string.ok, null)
+                                .create().show();
+                    }
+                });
+            }
+        }, 1000);
     }
 }

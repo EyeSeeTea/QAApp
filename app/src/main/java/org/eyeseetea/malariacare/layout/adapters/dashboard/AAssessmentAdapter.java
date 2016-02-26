@@ -78,9 +78,15 @@ public abstract class AAssessmentAdapter extends ADashboardAdapter implements ID
             Date completionDate = survey.getCompletionDate();
             SimpleDateFormat format = new SimpleDateFormat("MM/dd/yyyy");
             sentDate.setText(format.format(completionDate));
-            sentScore.setText(String.format("%.1f %%", survey.getMainScore()));
-            int colorId=LayoutUtils.trafficColor(survey.getMainScore());
-            sentScore.setTextColor(getContext().getResources().getColor(colorId));
+            if(survey.hasConflict()){
+                sentScore.setText((getContext().getResources().getString(R.string.feedback_info_conflict)).toUpperCase());
+                sentScore.setTextColor(getContext().getResources().getColor(R.color.darkRed));
+            }
+            else {
+                sentScore.setText(String.format("%.1f %%",survey.getMainScore()));
+                int colorId=LayoutUtils.trafficColor(survey.getMainScore());
+                sentScore.setTextColor(getContext().getResources().getColor(colorId));
+            }
         } else {
             //Status Cell
             ((CustomTextView) rowView.findViewById(R.id.score)).setText(getStatus(survey));
@@ -96,8 +102,11 @@ public abstract class AAssessmentAdapter extends ADashboardAdapter implements ID
             facilityName.setLayoutParams(new LinearLayout.LayoutParams(LinearLayout.LayoutParams.WRAP_CONTENT, 0, 0.5f));
             surveyType.setLayoutParams(new LinearLayout.LayoutParams(LinearLayout.LayoutParams.WRAP_CONTENT, 0, 0.5f));
         }
-
-        String surveyDescription = "- " + survey.getTabGroup().getProgram().getName();
+        String surveyDescription;
+        if(survey.isCompleted())
+            surveyDescription = "* " + survey.getTabGroup().getProgram().getName();
+        else
+            surveyDescription = "- " + survey.getTabGroup().getProgram().getName();
         surveyType.setText(surveyDescription);
 
         // check whether the following item belongs to the same org unit (to group the data related
