@@ -1,3 +1,4 @@
+[![Stories in Ready](https://badge.waffle.io/EyeSeeTea/QAApp.png?label=ready&title=Ready)](https://waffle.io/EyeSeeTea/QAApp)
 # QoC Android App
 
 QoC Android App is an open-source quality assessments tool connected with DHIS2 Health Information Servers. It eases the process of analyzing the data with a wide range of features such as automatic surveys generation, retreiving and pushing information to DHIS2 servers. Its highly detailed graphical reports allows to extract the best of your data.
