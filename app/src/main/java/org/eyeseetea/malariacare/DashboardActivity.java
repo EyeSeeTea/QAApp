@@ -111,8 +111,11 @@ public class DashboardActivity extends BaseActivity implements DashboardUnsentFr
         }
         initTabHost(savedInstanceState);
         /* set tabs in order */
-        if(!isPlanningTabHide())
+        if(!isPlanningTabHide()) {
             setTab(getResources().getString(R.string.tab_tag_plan), R.id.tab_plan_layout, getResources().getDrawable(R.drawable.tab_plan));
+        }
+        else
+            findViewById(R.id.tab_plan_layout).setVisibility(View.GONE);
         setTab(getResources().getString(R.string.tab_tag_assess), R.id.tab_assess_layout, getResources().getDrawable(R.drawable.tab_assess));
         setTab(getResources().getString(R.string.tab_tag_improve), R.id.tab_improve_layout, getResources().getDrawable(R.drawable.tab_improve));
         setTab(getResources().getString(R.string.tab_tag_monitor), R.id.tab_monitor_layout, getResources().getDrawable(R.drawable.tab_monitor));
@@ -152,7 +155,6 @@ public class DashboardActivity extends BaseActivity implements DashboardUnsentFr
                     tabHost.getCurrentTabView().setBackgroundColor(getResources().getColor(R.color.tab_blue_improve));
                     if(!isFeedbackFragmentActive()){
                         setActionBarDashboard();
-                        sentFragment.reloadSentSurveys();
                     }
                 } else if (tabId.equalsIgnoreCase(getResources().getString(R.string.tab_tag_monitor))) {
                     currentTabName=getString(R.string.monitor);
@@ -597,6 +599,7 @@ public class DashboardActivity extends BaseActivity implements DashboardUnsentFr
                     public void onClick(DialogInterface dialog, int arg1) {
                         Survey survey=Session.getSurvey();
                         survey.setCompleteSurveyState();
+                        alertOnComplete(survey);
                         closeSurveyFragment();
                     }
                 }).create().show();
@@ -726,6 +729,16 @@ public class DashboardActivity extends BaseActivity implements DashboardUnsentFr
         new AlertDialog.Builder(this)
                 .setMessage(getApplicationContext().getResources().getString(R.string.dialog_incompleted_compulsory_survey))
                 .setPositiveButton(getApplicationContext().getString(R.string.accept), null)
+                .create().show();
+    }
+
+    @Override
+    public void alertOnComplete(Survey survey) {
+        new AlertDialog.Builder(this)
+                .setTitle(null)
+                .setMessage(String.format(getApplicationContext().getResources().getString(R.string.dialog_info_on_complete),survey.getProgram().getName()))
+                .setPositiveButton(android.R.string.ok, null)
+                .setCancelable(true)
                 .create().show();
     }
 
