@@ -215,10 +215,7 @@ public class SurveyService extends IntentService {
         Log.d(TAG, "reloadPlanningSurveys");
         Session.putServiceValue(PLANNED_SURVEYS_ACTION, PlannedItemBuilder.getInstance().buildPlannedItems());
         //Returning result to anyone listening
-
         LocalBroadcastManager.getInstance(this).sendBroadcast(new Intent(PLANNED_SURVEYS_ACTION));
-
-
     }
 
     private void getAllCreateSurveyData() {
@@ -260,7 +257,7 @@ public class SurveyService extends IntentService {
     private void getAllMonitorData() {
         Log.d(TAG,"getAllMonitorData (Thread:"+Thread.currentThread().getId()+")");
         List<Program> programList=Program.getAllPrograms();
-        List<Survey> sentSurveys=Survey.getAllSentSurveys();
+        List<Survey> sentSurveys=Survey.getAllSentCompletedOrConflictSurveys();
 
         HashMap<String,List> monitorMap=new HashMap<>();
         monitorMap.put(PREPARE_SURVEYS, sentSurveys);
@@ -317,7 +314,6 @@ public class SurveyService extends IntentService {
         List<OrgUnit> orgUnitList=OrgUnit.getAllOrgUnit();
         List<Survey> completedUnsentSurveys=Survey.getAllCompletedUnsentSurveys();
         List<Survey> unsentSurveys=Survey.getAllInProgressSurveys();
-        List<Survey> sentSurveys=Survey.getAllSentSurveys();
         List<Survey> sentCompletedOrConflictSurveys=Survey.getAllSentCompletedOrConflictSurveys();
         for(Survey survey:unsentSurveys){
                 survey.getAnsweredQuestionRatio();
@@ -325,17 +321,14 @@ public class SurveyService extends IntentService {
 
         //Since intents does NOT admit NON serializable as values we use Session instead
         HashMap<String,List> monitorMap=new HashMap<>();
-        monitorMap.put(PREPARE_SURVEYS, sentSurveys);
+        monitorMap.put(PREPARE_SURVEYS, sentCompletedOrConflictSurveys);
         monitorMap.put(PREPARE_PROGRAMS, Program.getAllPrograms());
-
-        HashMap<String,List> orgUnitsAndPrograms=new HashMap<>();
-        orgUnitsAndPrograms.put(PREPARE_ORG_UNIT, orgUnitList);
-        orgUnitsAndPrograms.put(PREPARE_PROGRAMS, Program.getAllPrograms());
 
         HashMap<String,List> orgCreateSurveyData=new HashMap<>();
         orgCreateSurveyData.put(PREPARE_ORG_UNIT, orgUnitListParents);
         orgCreateSurveyData.put(PREPARE_ORG_UNIT_LEVEL, orgUnitLevelList);
         orgCreateSurveyData.put(PREPARE_PROGRAMS, Program.getAllPrograms());
+
         //Since intents does NOT admit NON serializable as values we use Session instead
         Session.putServiceValue(ALL_CREATE_SURVEY_DATA_ACTION, orgCreateSurveyData);
         Session.putServiceValue(ALL_MONITOR_DATA_ACTION,monitorMap);
@@ -343,7 +336,6 @@ public class SurveyService extends IntentService {
         Session.putServiceValue(ALL_COMPLETED_SURVEYS_ACTION, completedUnsentSurveys);
         Session.putServiceValue(ALL_SENT_OR_COMPLETED_OR_CONFLICT_SURVEYS_ACTION, sentCompletedOrConflictSurveys);
         Session.putServiceValue(PLANNED_SURVEYS_ACTION, PlannedItemBuilder.getInstance().buildPlannedItems());
-        Session.putServiceValue(ALL_ORG_UNITS_AND_PROGRAMS_ACTION,orgUnitsAndPrograms);
         Session.putServiceValue(ALL_PROGRAMS_ACTION,Program.getAllPrograms());
 
         //Returning result to anyone listening
@@ -355,8 +347,6 @@ public class SurveyService extends IntentService {
         LocalBroadcastManager.getInstance(this).sendBroadcast(new Intent(ALL_COMPLETED_SURVEYS_ACTION));
         LocalBroadcastManager.getInstance(this).sendBroadcast(new Intent(ALL_SENT_OR_COMPLETED_OR_CONFLICT_SURVEYS_ACTION));
         LocalBroadcastManager.getInstance(this).sendBroadcast(new Intent(PLANNED_SURVEYS_ACTION));
-        LocalBroadcastManager.getInstance(this).sendBroadcast(new Intent(ALL_ORG_UNITS_AND_PROGRAMS_ACTION));
-
     }
 
     /**
@@ -407,6 +397,8 @@ public class SurveyService extends IntentService {
         //Returning result to anyone listening
         Intent resultIntent= new Intent(ALL_COMPLETED_SURVEYS_ACTION);
         LocalBroadcastManager.getInstance(this).sendBroadcast(resultIntent);
+
+        getAllSentCompletedOrConflictSurveys();
     }
 
     /**
@@ -428,6 +420,7 @@ public class SurveyService extends IntentService {
         Session.putServiceValue(PREPARE_SURVEY_ACTION_COMPOSITE_SCORES, compositeScores);
         Session.putServiceValue(PREPARE_SURVEY_ACTION_TABS, tabs);
         Session.putServiceValue(PREPARE_ALL_TABS, allTabs);
+
         //Returning result to anyone listening
         Intent resultIntent = new Intent(PREPARE_SURVEY_ACTION);
         LocalBroadcastManager.getInstance(this).sendBroadcast(resultIntent);

@@ -156,7 +156,7 @@ public class PushController {
                     postProgress(context.getString(R.string.progress_push_updating_survey));
                     Log.d(TAG, "Updating pushed survey data...");
                     converter.saveSurveyStatus(getImportSummaryMap(result));
-                    Log.d(TAG, "PUSH process...OK");
+                    Log.d(TAG, "PUSH process...Finish");
                 }catch (Exception ex){
                     Log.e(TAG,"onSendDataFinished: "+ex.getLocalizedMessage());
                     postException(ex);
@@ -210,7 +210,7 @@ public class PushController {
         for(Survey survey:surveys){
             for(int i=0;i<converter.events.size();i++){
                 if(survey.getEventUid().equals(converter.events.get(i).getUid())) {
-                    converter.events.get(i).setCreated(EventExtended.format(survey.getCompletionDate()));
+                    converter.events.get(i).setCreated(EventExtended.format(survey.getCompletionDate(),EventExtended.COMPLETION_DATE_FORMAT));
                 }
             }
         }

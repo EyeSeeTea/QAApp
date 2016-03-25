@@ -78,9 +78,7 @@ public abstract class AAssessmentAdapter extends ADashboardAdapter implements ID
 
 
         if (sentDate != null){
-            Date eventDate = survey.getEventDate();
-            SimpleDateFormat format = new SimpleDateFormat("MM/dd/yyyy");
-            sentDate.setText(format.format(eventDate));
+            Date eventDate = survey.getCompletionDate();
             sentDate.setText(Utils.formatDate(eventDate));
             if(survey.hasConflict()){
                 sentScore.setText((getContext().getResources().getString(R.string.feedback_info_conflict)).toUpperCase());
