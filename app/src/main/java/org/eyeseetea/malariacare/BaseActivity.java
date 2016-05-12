@@ -20,7 +20,6 @@
 package org.eyeseetea.malariacare;
 
 import android.app.AlertDialog;
-import android.app.Dialog;
 import android.content.Context;
 import android.content.DialogInterface;
 import android.content.Intent;
@@ -31,24 +30,20 @@ import android.os.Bundle;
 import android.support.v7.app.ActionBarActivity;
 import android.text.Html;
 import android.text.SpannableString;
-import android.text.method.LinkMovementMethod;
 import android.text.util.Linkify;
 import android.util.Log;
-import android.view.Gravity;
 import android.view.Menu;
 import android.view.MenuItem;
-import android.view.View;
 import android.view.Window;
-import android.widget.Button;
-import android.widget.ImageView;
-import android.widget.TextView;
 
 import org.eyeseetea.malariacare.database.model.Survey;
 import org.eyeseetea.malariacare.database.utils.LocationMemory;
+import org.eyeseetea.malariacare.database.utils.PopulateDB;
 import org.eyeseetea.malariacare.database.utils.PreferencesState;
 import org.eyeseetea.malariacare.database.utils.Session;
 import org.eyeseetea.malariacare.layout.listeners.SurveyLocationListener;
 import org.eyeseetea.malariacare.layout.utils.LayoutUtils;
+import org.eyeseetea.malariacare.utils.AUtils;
 import org.eyeseetea.malariacare.utils.Utils;
 import org.hisp.dhis.android.sdk.controllers.DhisService;
 import org.hisp.dhis.android.sdk.events.UiEvent;
@@ -112,13 +107,21 @@ public abstract class BaseActivity extends ActionBarActivity {
                 debugMessage("User asked for settings");
                 goSettings();
                 break;
-            case R.id.action_license:
-                debugMessage("User asked for license");
-                showAlertWithMessage(R.string.settings_menu_licence, R.raw.gpl);
-                break;
             case R.id.action_about:
                 debugMessage("User asked for about");
-                showAlertWithHtmlMessageAndLastCommit(R.string.settings_menu_about, R.raw.about);
+                new Utils().showAlertWithHtmlMessageAndLastCommit(R.string.settings_menu_about, R.raw.about, BaseActivity.this);
+                break;
+            case R.id.action_copyright:
+                debugMessage("User asked for copyright");
+                new Utils().showAlertWithMessage(R.string.settings_menu_copyright, R.raw.copyright, BaseActivity.this);
+                break;
+            case R.id.action_licenses:
+                debugMessage("User asked for software licenses");
+                new Utils().showAlertWithHtmlMessage(R.string.settings_menu_licenses, R.raw.licenses, BaseActivity.this);
+                break;
+            case R.id.action_eula:
+                debugMessage("User asked for EULA");
+                new Utils().showAlertWithHtmlMessage(R.string.settings_menu_eula, R.raw.eula, BaseActivity.this);
                 break;
             case R.id.action_logout:
                 debugMessage("User asked for logout");
@@ -211,6 +214,12 @@ public abstract class BaseActivity extends ActionBarActivity {
                 .setNegativeButton(android.R.string.no, null).create().show();
     }
 
+    public void wipeData(){
+        PopulateDB.wipeDatabase();
+        PopulateDB.wipeSDKData();
+    };
+
+
     /**
      * Asks for location (required while starting to edit a survey)
      * @param survey
@@ -240,6 +249,7 @@ public abstract class BaseActivity extends ActionBarActivity {
             return;
         }
         debugMessage("Logging out from sdk...OK");
+        wipeData();
         Session.logout();
         finishAndGo(LoginActivity.class);
     }
@@ -265,103 +275,8 @@ public abstract class BaseActivity extends ActionBarActivity {
 
 
 
-    /**
-     * Shows an alert dialog with a big message inside based on a raw resource
-     * @param titleId Id of the title resource
-     * @param rawId Id of the raw text resource
-     */
-    private void showAlertWithMessage(int titleId, int rawId){
-        InputStream message = getApplicationContext().getResources().openRawResource(rawId);
-        showAlert(titleId, Utils.convertFromInputStreamToString(message).toString());
-    }
 
-    /**
-     * Shows an alert dialog with a big message inside based on a raw resource HTML formatted
-     * @param titleId Id of the title resource
-     * @param rawId Id of the raw text resource in HTML format
-     */
-    private void showAlertWithHtmlMessageAndLastCommit(int titleId, int rawId){
-        String stringMessage = getMessageWithCommit(rawId);
-        final SpannableString linkedMessage = new SpannableString(Html.fromHtml(stringMessage));
-        Linkify.addLinks(linkedMessage, Linkify.EMAIL_ADDRESSES | Linkify.WEB_URLS);
-        //Fixme: the eds build have different dialog style.
-        if(BuildConfig.FLAVOR.equals("hnqis"))
-            showAboutAlert(titleId, linkedMessage);
-        else
-            showAlert(titleId, linkedMessage);
-    }
 
-    /**
-     * Merge the lastcommit into the raw file
-     * @param rawId Id of the raw text resource in HTML format
-     */
-    private String getMessageWithCommit(int rawId) {
-        InputStream message = getApplicationContext().getResources().openRawResource(rawId);
-        String stringCommit;
-        //Check if lastcommit.txt file exist, and if not exist show as unavailable.
-        int layoutId = getApplicationContext().getResources().getIdentifier("lastcommit", "raw", getApplicationContext().getPackageName());
-        if (layoutId == 0){
-            stringCommit=getString(R.string.unavailable);
-        } else {
-            InputStream commit = getApplicationContext().getResources().openRawResource( layoutId);
-            stringCommit=Utils.convertFromInputStreamToString(commit).toString();
-        }
-        String stringMessage=Utils.convertFromInputStreamToString(message).toString();
-        if(stringCommit.contains(getString(R.string.unavailable))){
-            stringCommit=String.format(getString(R.string.lastcommit),stringCommit);
-            stringCommit=stringCommit+" "+getText(R.string.lastcommit_unavailable);
-        }
-        else {
-            stringCommit = String.format(getString(R.string.lastcommit), stringCommit);
-        }
-        stringMessage=String.format(stringMessage,stringCommit);
-        return stringMessage;
-    }
-
-    /**
-     * Shows an alert dialog with a given string
-     * @param titleId Id of the title resource
-     * @param text String of the message
-     */
-    private void showAlert(int titleId, CharSequence text){
-        final AlertDialog dialog = new AlertDialog.Builder(this)
-                .setTitle(getApplicationContext().getString(titleId))
-                .setMessage(text)
-                .setNeutralButton(android.R.string.ok, null).create();
-        dialog.show();
-        ((TextView)dialog.findViewById(android.R.id.message)).setMovementMethod(LinkMovementMethod.getInstance());
-    }
-
-    private void showAboutAlert(int titleId, CharSequence text){
-        final Dialog dialog = new Dialog(BaseActivity.this);
-        dialog.setContentView(R.layout.dialog_about);
-        dialog.setTitle(titleId);
-        dialog.setCancelable(true);
-
-        //set up text title
-        TextView textTile = (TextView) dialog.findViewById(R.id.aboutTitle);
-        textTile.setText(BuildConfig.VERSION_NAME);
-        textTile.setGravity(Gravity.RIGHT);
-
-        //set up image view
-        ImageView img = (ImageView) dialog.findViewById(R.id.aboutImage);
-        img.setImageResource(R.drawable.psi);
-
-        //set up text title
-        TextView textContent = (TextView) dialog.findViewById(R.id.aboutMessage);
-        textContent.setMovementMethod(LinkMovementMethod.getInstance());
-        textContent.setText(text);
-        //set up button
-        Button button = (Button) dialog.findViewById(R.id.aboutButton);
-        button.setOnClickListener(new View.OnClickListener() {
-            @Override
-            public void onClick(View v) {
-               dialog.dismiss();
-            }
-        });
-        //now that the dialog is set up, it's time to show it
-        dialog.show();
-    }
     /**
      * Logs a debug message using current activity SimpleName as tag. Ex:
      *   SurveyActivity => ".SurveyActivity"

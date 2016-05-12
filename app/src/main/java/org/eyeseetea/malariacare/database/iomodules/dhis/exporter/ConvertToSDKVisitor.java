@@ -30,14 +30,18 @@ import org.eyeseetea.malariacare.DashboardActivity;
 import org.eyeseetea.malariacare.R;
 import org.eyeseetea.malariacare.database.iomodules.dhis.importer.models.EventExtended;
 import org.eyeseetea.malariacare.database.model.CompositeScore;
+import org.eyeseetea.malariacare.database.model.ControlDataElement;
+import org.eyeseetea.malariacare.database.model.OrgUnitProgramRelation;
 import org.eyeseetea.malariacare.database.model.Survey;
 import org.eyeseetea.malariacare.database.model.User;
 import org.eyeseetea.malariacare.database.model.Value;
 import org.eyeseetea.malariacare.database.utils.LocationMemory;
 import org.eyeseetea.malariacare.database.utils.PreferencesState;
 import org.eyeseetea.malariacare.database.utils.Session;
+import org.eyeseetea.malariacare.database.utils.planning.SurveyPlanner;
 import org.eyeseetea.malariacare.layout.score.ScoreRegister;
 import org.eyeseetea.malariacare.utils.Constants;
+import org.eyeseetea.malariacare.utils.AUtils;
 import org.eyeseetea.malariacare.utils.Utils;
 import org.hisp.dhis.android.sdk.persistence.models.DataValue;
 import org.hisp.dhis.android.sdk.persistence.models.Event;
@@ -65,16 +69,19 @@ public class ConvertToSDKVisitor implements IConvertToSDKVisitor {
      */
     Context context;
 
-    String mainScoreUID;
-    String mainScoreAUID;
-    String mainScoreBUID;
-    String mainScoreCUID;
-    String forwardOrderUID;
+    String overallScoreCode;
+    String mainScoreClassCode;
+    String mainScoreACode;
+    String mainScoreBCode;
+    String mainScoreCCode;
+    String forwardOrderCode;
+    String pushDeviceCode;
+    String overallProductivityCode;
+    String nextAssessmentCode;
 
-    String createdOnUID;
-    String createdByUID;
-    String updatedDateUID;
-    String updatedUserUid;
+    String createdOnCode;
+    String uploadedOnCode;
+    String uploadedByCode;
     /**
      * List of surveys that are going to be pushed
      */
@@ -103,16 +110,20 @@ public class ConvertToSDKVisitor implements IConvertToSDKVisitor {
 
     ConvertToSDKVisitor(Context context){
         this.context=context;
-        mainScoreUID=context.getString(R.string.main_score);
-        mainScoreAUID=context.getString(R.string.main_score_a);
-        mainScoreBUID=context.getString(R.string.main_score_b);
-        mainScoreCUID=context.getString(R.string.main_score_c);
-        forwardOrderUID=context.getString(R.string.forward_order);
+        // FIXME: We should create a visitor to translate the ControlDataElement class
+        overallScoreCode = ControlDataElement.findControlDataElementUid(context.getString(R.string.overall_score_code));
+        mainScoreClassCode = ControlDataElement.findControlDataElementUid(context.getString(R.string.main_score_class_code));
+        mainScoreACode = ControlDataElement.findControlDataElementUid(context.getString(R.string.main_score_a_code));
+        mainScoreBCode = ControlDataElement.findControlDataElementUid(context.getString(R.string.main_score_b_code));
+        mainScoreCCode = ControlDataElement.findControlDataElementUid(context.getString(R.string.main_score_c_code));
+        forwardOrderCode = ControlDataElement.findControlDataElementUid(context.getString(R.string.forward_order_code));
+        pushDeviceCode = ControlDataElement.findControlDataElementUid(context.getString(R.string.push_device_code));
+        overallProductivityCode = ControlDataElement.findControlDataElementUid(context.getString(R.string.overall_productivity_code));
+        nextAssessmentCode = ControlDataElement.findControlDataElementUid(context.getString(R.string.next_assessment_code));
 
-        createdOnUID =context.getString(R.string.createdOnUID);
-        createdByUID =context.getString(R.string.createdByUid);
-        updatedDateUID=context.getString(R.string.uploadedDateUID);
-        updatedUserUid=context.getString(R.string.createdByUid);
+        createdOnCode = ControlDataElement.findControlDataElementUid(context.getString(R.string.created_on_code));
+        uploadedOnCode =ControlDataElement.findControlDataElementUid(context.getString(R.string.upload_date_code));
+        uploadedByCode = ControlDataElement.findControlDataElementUid(context.getString(R.string.uploaded_by_code));
         surveys = new ArrayList<>();
         events = new ArrayList<>();
     }
@@ -142,11 +153,7 @@ public class ConvertToSDKVisitor implements IConvertToSDKVisitor {
             value.accept(this);
         }
 
-        Log.d(TAG,"Saving dates in control dataelements");
-
-        buildDateControlDataElements(survey);
-
-        Log.d(TAG, "Creating datavalues from other stuff...");
+        Log.d(TAG,"Saving control dataelements");
         buildControlDataElements(survey);
 
         //Annotate both objects to update its state once the process is over
@@ -161,7 +168,7 @@ public class ConvertToSDKVisitor implements IConvertToSDKVisitor {
         dataValue.setEvent(currentEvent.getEvent());
         dataValue.setProvidedElsewhere(false);
         dataValue.setStoredBy(getSafeUsername());
-        dataValue.setValue(Utils.round(ScoreRegister.getCompositeScore(compositeScore)));
+        dataValue.setValue(AUtils.round(ScoreRegister.getCompositeScore(compositeScore)));
         dataValue.save();
     }
 
@@ -185,7 +192,7 @@ public class ConvertToSDKVisitor implements IConvertToSDKVisitor {
      * Builds an event from a survey
      * @return
      */
-    private Event buildEvent()throws Exception{
+    private Event buildEvent() throws Exception{
         currentEvent=new Event();
 
         currentEvent.setStatus(Event.STATUS_COMPLETED);
@@ -211,10 +218,10 @@ public class ConvertToSDKVisitor implements IConvertToSDKVisitor {
         uploadedDate =currentSurvey.getUploadedDate();
 
         // NOTE: do not try to set the event creation date. SDK will try to update the event in the next push instead of creating it and that will crash
-        currentEvent.setEventDate(EventExtended.format(currentSurvey.getCompletionDate(), EventExtended.COMPLETION_DATE_FORMAT));
-        currentEvent.setDueDate(EventExtended.format(currentSurvey.getScheduledDate(),EventExtended.COMPLETION_DATE_FORMAT));
+        currentEvent.setEventDate(EventExtended.format(currentSurvey.getCompletionDate(), EventExtended.DHIS2_DATE_FORMAT));
+        currentEvent.setDueDate(EventExtended.format(currentSurvey.getScheduledDate(),EventExtended.DHIS2_DATE_FORMAT));
         //Not used
-        currentEvent.setLastUpdated(EventExtended.format(currentSurvey.getUploadedDate(),EventExtended.COMPLETION_DATE_FORMAT));
+        currentEvent.setLastUpdated(EventExtended.format(currentSurvey.getUploadedDate(),EventExtended.DHIS2_DATE_FORMAT));
         }
 
     /**
@@ -223,38 +230,55 @@ public class ConvertToSDKVisitor implements IConvertToSDKVisitor {
      */
     private void buildControlDataElements(Survey survey) {
 
-        //MainScoreUID
-        buildAndSaveDataValue(mainScoreUID, survey.getType());
-
-        //MainScore A
-        buildAndSaveDataValue(mainScoreAUID, survey.isTypeA() ? "true" : "false");
-
-        //MainScore B
-        buildAndSaveDataValue(mainScoreBUID, survey.isTypeB() ? "true" : "false");
-
-        //MainScoreC
-        buildAndSaveDataValue(mainScoreCUID, survey.isTypeC() ? "true" : "false");
-
-        //Forward Order
-        buildAndSaveDataValue(forwardOrderUID, context.getString(R.string.forward_order_value));
-    }
-
-    /**
-     * Builds several datavalues from the Dates of the survey
-     * @param survey
-     */
-    private void buildDateControlDataElements(Survey survey) {
+        //It Checks if the dataelement exists, before build and save the datavalue
         //Created date
-        buildAndSaveDataValue(createdOnUID, EventExtended.format(survey.getCreationDate(), EventExtended.SIMPLE_DATE_FORMAT));
+        if(!createdOnCode.equals(""))
+            buildAndSaveDataValue(createdOnCode, EventExtended.format(survey.getCreationDate(), EventExtended.AMERICAN_DATE_FORMAT));
 
         //Updated date
-        buildAndSaveDataValue(updatedDateUID, EventExtended.format(survey.getUploadedDate(), EventExtended.SIMPLE_DATE_FORMAT));
+        if(!uploadedOnCode.equals(""))
+            buildAndSaveDataValue(uploadedOnCode, EventExtended.format(survey.getUploadedDate(), EventExtended.AMERICAN_DATE_FORMAT));
 
         //Updated by user
-        buildAndSaveDataValue(updatedUserUid, Session.getUser().getUid());
+        if(!uploadedByCode.equals(""))
+            buildAndSaveDataValue(uploadedByCode, Session.getUser().getUsername());
 
-        //Updated by user
-        buildAndSaveDataValue(createdByUID, Session.getUser().getUid());
+
+        //Overall score
+        if(!overallScoreCode.equals(""))
+            buildAndSaveDataValue(overallScoreCode, survey.getMainScore().toString());
+
+        //MainScoreUID
+        if(!mainScoreClassCode.equals(""))
+            buildAndSaveDataValue(mainScoreClassCode, survey.getType());
+
+        //MainScore A
+        if(!mainScoreACode.equals(""))
+            buildAndSaveDataValue(mainScoreACode, survey.isTypeA() ? "true" : "false");
+
+        //MainScore B
+        if(!mainScoreBCode.equals(""))
+            buildAndSaveDataValue(mainScoreBCode, survey.isTypeB() ? "true" : "false");
+
+        //MainScoreC
+        if(!mainScoreCCode.equals(""))
+            buildAndSaveDataValue(mainScoreCCode, survey.isTypeC() ? "true" : "false");
+
+        //Forward Order
+        if(!forwardOrderCode.equals(""))
+            buildAndSaveDataValue(forwardOrderCode, context.getString(R.string.forward_order_value));
+
+        //Push Device
+        if(!pushDeviceCode.equals(""))
+            buildAndSaveDataValue(pushDeviceCode, Session.getPhoneMetaData().getPhone_metaData() + "###" + new Utils().getCommitHash(context));
+
+        //Overall productivity
+        if(!overallProductivityCode.equals(""))
+            buildAndSaveDataValue(overallProductivityCode, Integer.toString(OrgUnitProgramRelation.getProductivity(survey)));
+
+        //Next assessment
+        if(!nextAssessmentCode.equals(""))
+            buildAndSaveDataValue(nextAssessmentCode, EventExtended.format(SurveyPlanner.getInstance().findScheduledDateBySurvey(survey), EventExtended.AMERICAN_DATE_FORMAT));
     }
 
     private void buildAndSaveDataValue(String UID, String value){
@@ -338,6 +362,7 @@ public class ConvertToSDKVisitor implements IConvertToSDKVisitor {
                 iEvent.delete();
                 Log.d(TAG, "PUSH process...Fail pushing survey: " + iSurvey.getId_survey());
             }else{
+                PushController.getInstance().saveCreationDateInSDK(surveys);
                 iSurvey.setStatus(Constants.SURVEY_SENT);
                 iSurvey.saveMainScore();
                 iSurvey.save();

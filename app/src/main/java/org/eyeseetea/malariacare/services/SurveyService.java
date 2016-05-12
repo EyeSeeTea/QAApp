@@ -219,8 +219,9 @@ public class SurveyService extends IntentService {
     }
 
     private void getAllCreateSurveyData() {
+        //android.os.Debug.waitForDebugger();
         Log.d(TAG,"getAllCreateSurveyData (Thread:"+Thread.currentThread().getId()+")");
-        List<OrgUnit> orgUnitList = new Select().all().from(OrgUnit.class).where(Condition.column(OrgUnit$Table.ID_PARENT).isNull()).queryList();
+        List<OrgUnit> orgUnitList = new Select().from(OrgUnit.class).where(Condition.column(OrgUnit$Table.ID_PARENT).isNull()).queryList();
         List<OrgUnitLevel> orgUnitLevelList = new Select().all().from(OrgUnitLevel.class).queryList();
         List<Program> programList = Program.list();
 

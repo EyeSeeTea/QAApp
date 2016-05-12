@@ -36,6 +36,7 @@ import org.eyeseetea.malariacare.database.iomodules.dhis.importer.models.Program
 import org.eyeseetea.malariacare.database.iomodules.dhis.importer.models.UserAccountExtended;
 import org.eyeseetea.malariacare.database.model.Answer;
 import org.eyeseetea.malariacare.database.model.CompositeScore;
+import org.eyeseetea.malariacare.database.model.ControlDataElement;
 import org.eyeseetea.malariacare.database.model.OrgUnit;
 import org.eyeseetea.malariacare.database.model.OrgUnitLevel;
 import org.eyeseetea.malariacare.database.model.OrgUnitProgramRelation;
@@ -167,7 +168,10 @@ public class ConvertFromSDKVisitor implements IConvertFromSDKVisitor {
         //create the orgUnit
         org.eyeseetea.malariacare.database.model.OrgUnit appOrgUnit= new org.eyeseetea.malariacare.database.model.OrgUnit();
         //Set name
-        appOrgUnit.setName(organisationUnit.getLabel());
+        if(organisationUnit.getLabel()==null)
+            appOrgUnit.setName(organisationUnit.getName());
+        else
+            appOrgUnit.setName(organisationUnit.getLabel());
         //Set uid
         appOrgUnit.setUid(organisationUnit.getId());
         //Set orgUnitLevel
@@ -255,6 +259,7 @@ public class ConvertFromSDKVisitor implements IConvertFromSDKVisitor {
         User appUser = new User();
         appUser.setUid(userAccount.getUId());
         appUser.setName(userAccount.getName());
+        appUser.setUsername(userAccount.getUsername());
         appUser.save();
     }
 
@@ -266,12 +271,17 @@ public class ConvertFromSDKVisitor implements IConvertFromSDKVisitor {
     @Override
     public void visit(DataElementExtended sdkDataElementExtended) {
         Object questionOrCompositeScore;
+        if(appMapObjects.containsKey(sdkDataElementExtended.getDataElement().getUid()))
+            return;
         if(sdkDataElementExtended.isCompositeScore()){
             questionOrCompositeScore=buildCompositeScore(sdkDataElementExtended);
         }else if(sdkDataElementExtended.isQuestion()){
             questionOrCompositeScore=buildQuestion(sdkDataElementExtended);
             //Question type is annotated in 'answer' from an attribute of the question
-        }else{
+        }else if (sdkDataElementExtended.isControlDataElement()) {
+            questionOrCompositeScore=buildControlDataElement(sdkDataElementExtended);
+        } else {
+            Log.d(TAG, "Error" + sdkDataElementExtended.getDataElement().toString());
             return;
         }
         appMapObjects.put(sdkDataElementExtended.getDataElement().getUid(), questionOrCompositeScore);
@@ -333,9 +343,9 @@ public class ConvertFromSDKVisitor implements IConvertFromSDKVisitor {
             return;
         }
 
-        if(dataValue.getDataElement().equals(PreferencesState.getInstance().getContext().getResources().getString(R.string.createdOnUID))){
+        if(dataValue.getDataElement().equals(PreferencesState.getInstance().getContext().getResources().getString(R.string.created_on_code))){
             try{
-                Date date = EventExtended.parseDate(dataValue.getValue(),EventExtended.SIMPLE_DATE_FORMAT);
+                Date date = EventExtended.parseDate(dataValue.getValue(),EventExtended.AMERICAN_DATE_FORMAT);
                 survey.setCreationDate(date);
                 survey.save();
                 //Annotate object in map
@@ -346,9 +356,9 @@ public class ConvertFromSDKVisitor implements IConvertFromSDKVisitor {
             return;
         }
 
-        if(dataValue.getDataElement().equals(PreferencesState.getInstance().getContext().getResources().getString(R.string.uploadedDateUID))){
+        if(dataValue.getDataElement().equals(PreferencesState.getInstance().getContext().getResources().getString(R.string.upload_date_code))){
             try{
-                Date date = EventExtended.parseDate(dataValue.getValue(),EventExtended.SIMPLE_DATE_FORMAT);
+                Date date = EventExtended.parseDate(dataValue.getValue(),EventExtended.AMERICAN_DATE_FORMAT);
                 survey.setUploadedDate(date);
                 survey.save();
                 //Annotate object in map
@@ -359,7 +369,7 @@ public class ConvertFromSDKVisitor implements IConvertFromSDKVisitor {
             return;
         }
 
-        if(dataValue.getDataElement().equals(PreferencesState.getInstance().getContext().getResources().getString(R.string.createdByUid))){
+        if(dataValue.getDataElement().equals(PreferencesState.getInstance().getContext().getResources().getString(R.string.uploaded_by_code))){
             User user=User.getUser(dataValue.getValue());
             if(user==null) {
                 user = new User(dataValue.getValue(), dataValue.getValue());
@@ -371,15 +381,20 @@ public class ConvertFromSDKVisitor implements IConvertFromSDKVisitor {
             appMapObjects.put(dataValue.getEvent(), survey);
             return;
         }
-        //Datavalue is a value from a question
-        Question question=(Question)appMapObjects.get(dataValue.getDataElement());
 
         Value value=new Value();
-        value.setQuestion(question);
-        value.setSurvey(survey);
+        //Datavalue is a value from a question
+        org.eyeseetea.malariacare.database.model.Option option = null;
+        try{
+            Question question=(Question)appMapObjects.get(dataValue.getDataElement());
+            value.setQuestion(question);
+            option=sdkDataValueExtended.findOptionByQuestion(question);
+            value.setOption(option);
+        }catch (ClassCastException e){
+            Log.d(TAG,"Ignoring controlDataelement in DataValue converting");
+        }
 
-        org.eyeseetea.malariacare.database.model.Option option=sdkDataValueExtended.findOptionByQuestion(question);
-        value.setOption(option);
+        value.setSurvey(survey);
         //No option -> text question (straight value)
         if(option==null){
             value.setValue(dataValue.getValue());
@@ -475,6 +490,22 @@ public class ConvertFromSDKVisitor implements IConvertFromSDKVisitor {
         return compositeScore;
     }
 
+
+
+    private ControlDataElement buildControlDataElement(DataElementExtended sdkDataElementExtended) {
+        DataElement dataElement=sdkDataElementExtended.getDataElement();
+        ControlDataElement controlDataElement = new ControlDataElement();
+        controlDataElement.setUid(dataElement.getUid());
+        controlDataElement.setCode(dataElement.getCode());
+        controlDataElement.setName(dataElement.getDisplayName());
+        controlDataElement.setValueType(dataElement.getValueType().name());
+
+        //Parent score and Order can only be set once every score in saved
+        controlDataElement.save();
+        return controlDataElement;
+
+    }
+
     /**
      * Due to permissions programs 'belongs' to a given orgunit and that relationship has a productivity
      * @param sdkOrganisationUnitExtended Extended sdk orgUnit (used to cache array with values)
@@ -528,6 +559,22 @@ public class ConvertFromSDKVisitor implements IConvertFromSDKVisitor {
 
             OrgUnit appOrgUnit = (OrgUnit)appMapObjects.get(organisationUnit.getId());
             String parentUID=organisationUnit.getParent();
+            //FIXME: review this algorithm
+            if(parentUID==null) {
+                //path format=/VaXGMQY18R2/TyoXRBeZ12K/TeqzAowss4n/Doa9u6qkSO3/qeENMD3x6y7
+                //path[0] is ""
+                //path [1] is the last parent "VaXGMQY18R2"
+                String path = organisationUnit.getPath();
+                String[] pathUids = path.split("/");
+                if (pathUids.length > 2 && !pathUids[1].equals(organisationUnit.getId())) {
+                    for (int i = 2; i < pathUids.length; i++) {
+                        if (pathUids[i].equals(organisationUnit.getId())) {
+                            parentUID = pathUids[i - 1];
+                            Log.d(TAG, organisationUnit.getId() + " parent " + parentUID);
+                        }
+                    }
+                }
+            }
             //No parent nothing to do
             if(parentUID==null){
                 Log.i(TAG,String.format("%s is a root orgUnit",appOrgUnit.getName()));
@@ -543,7 +590,7 @@ public class ConvertFromSDKVisitor implements IConvertFromSDKVisitor {
                 continue;
             }
 
-            appOrgUnit.setOrgUnit(appOrgUnit.getId_org_unit());
+            appOrgUnit.setOrgUnit(parentOrgUnit.getId_org_unit());
             appOrgUnit.save();
         }
         return true;

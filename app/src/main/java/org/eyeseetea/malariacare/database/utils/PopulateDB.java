@@ -10,21 +10,28 @@ import com.raizlabs.android.dbflow.structure.BaseModel;
 
 import org.eyeseetea.malariacare.database.model.Answer;
 import org.eyeseetea.malariacare.database.model.CompositeScore;
+import org.eyeseetea.malariacare.database.model.ControlDataElement;
 import org.eyeseetea.malariacare.database.model.Header;
 import org.eyeseetea.malariacare.database.model.Match;
 import org.eyeseetea.malariacare.database.model.Option;
 import org.eyeseetea.malariacare.database.model.OrgUnit;
 import org.eyeseetea.malariacare.database.model.OrgUnitLevel;
+import org.eyeseetea.malariacare.database.model.OrgUnitProgramRelation;
 import org.eyeseetea.malariacare.database.model.Program;
 import org.eyeseetea.malariacare.database.model.Question;
 import org.eyeseetea.malariacare.database.model.QuestionOption;
 import org.eyeseetea.malariacare.database.model.QuestionRelation;
 import org.eyeseetea.malariacare.database.model.Score;
 import org.eyeseetea.malariacare.database.model.Survey;
+import org.eyeseetea.malariacare.database.model.SurveySchedule;
 import org.eyeseetea.malariacare.database.model.Tab;
 import org.eyeseetea.malariacare.database.model.TabGroup;
 import org.eyeseetea.malariacare.database.model.User;
 import org.eyeseetea.malariacare.database.model.Value;
+import org.hisp.dhis.android.sdk.persistence.models.DataValue;
+import org.hisp.dhis.android.sdk.persistence.models.Event;
+import org.hisp.dhis.android.sdk.persistence.models.FailedItem;
+import org.hisp.dhis.android.sdk.persistence.preferences.DateTimeManager;
 
 import java.io.IOException;
 import java.io.InputStreamReader;
@@ -204,8 +211,10 @@ public class PopulateDB {
                 Value.class,
                 Score.class,
                 Survey.class,
+                SurveySchedule.class,
                 OrgUnit.class,
                 OrgUnitLevel.class,
+                OrgUnitProgramRelation.class,
                 User.class,
                 QuestionOption.class,
                 Match.class,
@@ -217,10 +226,23 @@ public class PopulateDB {
                 Header.class,
                 Tab.class,
                 TabGroup.class,
-                Program.class
+                Program.class,
+                ControlDataElement.class
         );
     }
 
+    /**
+     * Deletes all data from the sdk database
+     */
+    public static void wipeSDKData() {
+        Delete.tables(
+                Event.class,
+                DataValue.class,
+                FailedItem.class
+        );
+        DateTimeManager.getInstance().delete();
+        Log.d(TAG,"Delete sdk db");
+    }
     protected static void saveItem(Map items, BaseModel model, Integer pk){
         items.put(pk,model);
         model.save();

@@ -60,6 +60,7 @@ import org.hisp.dhis.android.sdk.utils.log.LogMessage;
 import org.hisp.dhis.android.sdk.utils.log.SdkLogger;
 
 import java.util.ArrayList;
+import java.util.Calendar;
 import java.util.Collections;
 import java.util.Comparator;
 import java.util.HashMap;
@@ -72,6 +73,7 @@ import java.util.Map;
  */
 public class PullController {
     private final String TAG = ".PullController";
+    public static final int NUMBER_OF_MONTHS=6;
 
     private final static Class MANDATORY_METADATA_TABLES[] = {
             org.hisp.dhis.android.sdk.persistence.models.Attribute.class,
@@ -151,8 +153,14 @@ public class PullController {
             enableMetaDataFlags();
             //Delete previous metadata
             TrackerController.setMaxEvents(PreferencesState.getInstance().getMaxEvents());
+            Calendar month = Calendar.getInstance();
+            month.add(Calendar.MONTH, -NUMBER_OF_MONTHS);
+            TrackerController.setStartDate(EventExtended.format(month.getTime(),EventExtended.AMERICAN_DATE_FORMAT));
+
             MetaDataController.clearMetaDataLoadedFlags();
             MetaDataController.wipe();
+            PopulateDB.wipeSDKData();
+            PopulateDB.wipeDatabase();
             //Pull new metadata
             postProgress(context.getString(R.string.progress_pull_downloading));
             try {
@@ -322,18 +330,22 @@ public class PullController {
         Map<String, List<DataElement>> programsDataelements = new HashMap<>();
         if (!ProgressActivity.PULL_IS_ACTIVE) return;
         for (org.hisp.dhis.android.sdk.persistence.models.Program program : programs) {
+            Log.i(TAG,String.format("\t program '%s' ",program.getName()));
             List<DataElement> dataElements = new ArrayList<>();
             String programUid = program.getUid();
             List<ProgramStage> programStages = program.getProgramStages();
             for (org.hisp.dhis.android.sdk.persistence.models.ProgramStage programStage : programStages) {
+                Log.i(TAG,String.format("\t\t programStage '%s' ",program.getName()));
                 List<ProgramStageDataElement> programStageDataElements = programStage.getProgramStageDataElements();
                 for (ProgramStageDataElement programStageDataElement : programStageDataElements) {
-                    if (programStageDataElement.getDataElement().getUid() != null) {
+                    DataElement dataElement =programStageDataElement.getDataElement();
+                    if (dataElement!=null && dataElement.getUid() != null) {
                         if (!ProgressActivity.PULL_IS_ACTIVE) return;
-                        dataElements.add(programStageDataElement.getDataElement());
+                        dataElements.add(dataElement);
                     }
                 }
             }
+            Log.i(TAG,String.format("\t program '%s' DONE ",program.getName()));
             if (!ProgressActivity.PULL_IS_ACTIVE) return;
             Collections.sort(dataElements, new Comparator<DataElement>() {
                 public int compare(DataElement de1, DataElement de2) {
