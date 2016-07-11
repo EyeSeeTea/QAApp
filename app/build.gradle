@@ -65,19 +65,19 @@ android {
     }
     productFlavors {
         eds {
-            applicationId "org.eyeseetea.malariacare.eds_bb"
+            applicationId "org.eyeseetea.malariacare.eds"
             versionName "2.0.3"
             minSdkVersion 15
             targetSdkVersion 21
         }
         hnqis {
-            applicationId "org.eyeseetea.malariacare.hnqis_bb"
+            applicationId "org.eyeseetea.malariacare.hnqis"
             versionName "1.0.3"
             minSdkVersion 15
             targetSdkVersion 21
         }
         surveillance {
-            applicationId "org.eyeseetea.malariacare.surveillance_bb"
+            applicationId "org.eyeseetea.malariacare.surveillance"
             versionName "5.0.0"
             minSdkVersion 15
             targetSdkVersion 21
