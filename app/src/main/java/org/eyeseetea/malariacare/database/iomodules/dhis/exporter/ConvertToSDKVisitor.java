@@ -40,6 +40,7 @@ import org.eyeseetea.malariacare.database.utils.PreferencesState;
 import org.eyeseetea.malariacare.database.utils.Session;
 import org.eyeseetea.malariacare.database.utils.planning.SurveyPlanner;
 import org.eyeseetea.malariacare.layout.score.ScoreRegister;
+import org.eyeseetea.malariacare.layout.score.ScoreUtils;
 import org.eyeseetea.malariacare.utils.Constants;
 import org.eyeseetea.malariacare.utils.AUtils;
 import org.eyeseetea.malariacare.utils.Utils;
@@ -161,13 +162,17 @@ public class ConvertToSDKVisitor implements IConvertToSDKVisitor {
 
     @Override
     public void visit(CompositeScore compositeScore) {
+        List<Float> result=ScoreRegister.getCompositeScoreResult(compositeScore,currentSurvey.getId_survey(), Constants.PUSH_MODULE_KEY);
+        //Checks if the result have at least one valid denominator.
+        if(result!=null && result.get(1)==0)
+            return;
         DataValue dataValue=new DataValue();
         dataValue.setDataElement(compositeScore.getUid());
         dataValue.setLocalEventId(currentEvent.getLocalId());
         dataValue.setEvent(currentEvent.getEvent());
         dataValue.setProvidedElsewhere(false);
         dataValue.setStoredBy(getSafeUsername());
-        dataValue.setValue(AUtils.round(ScoreRegister.getCompositeScore(compositeScore,currentSurvey.getId_survey(), Constants.PUSH_MODULE_KEY)));
+        dataValue.setValue(AUtils.round(ScoreUtils.calculateScoreFromNumDen(result)));
         dataValue.save();
     }
 
@@ -232,11 +237,11 @@ public class ConvertToSDKVisitor implements IConvertToSDKVisitor {
         //It Checks if the dataelement exists, before build and save the datavalue
         //Created date
         if(!createdOnCode.equals(""))
-            buildAndSaveDataValue(createdOnCode, EventExtended.format(survey.getCreationDate(), EventExtended.AMERICAN_DATE_FORMAT));
+            buildAndSaveDataValue(createdOnCode, EventExtended.format(survey.getCreationDate(), EventExtended.DHIS2_DATE_FORMAT));
 
         //Updated date
         if(!uploadedOnCode.equals(""))
-            buildAndSaveDataValue(uploadedOnCode, EventExtended.format(survey.getUploadedDate(), EventExtended.AMERICAN_DATE_FORMAT));
+            buildAndSaveDataValue(uploadedOnCode, EventExtended.format(survey.getUploadedDate(), EventExtended.DHIS2_DATE_FORMAT));
 
         //Updated by user
         if(!uploadedByCode.equals(""))
@@ -298,7 +303,6 @@ public class ConvertToSDKVisitor implements IConvertToSDKVisitor {
      */
     private void updateSurvey(List<CompositeScore> compositeScores, float idSurvey, String module){
         currentSurvey.setMainScore(ScoreRegister.calculateMainScore(compositeScores, idSurvey, module));
-        currentSurvey.setStatus(Constants.SURVEY_SENT);
         currentSurvey.setUploadedDate(uploadedDate);
         currentSurvey.setEventUid(currentEvent.getUid());
     }
