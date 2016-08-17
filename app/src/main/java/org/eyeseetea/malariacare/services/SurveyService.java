@@ -34,14 +34,16 @@ import org.eyeseetea.malariacare.database.model.OrgUnitLevel;
 import org.eyeseetea.malariacare.database.model.Program;
 import org.eyeseetea.malariacare.database.model.Survey;
 import org.eyeseetea.malariacare.database.model.Tab;
+import org.eyeseetea.malariacare.database.model.Tab$Table;
 import org.eyeseetea.malariacare.database.utils.Session;
+import org.eyeseetea.malariacare.database.utils.feedback.DashboardSentBundle;
 import org.eyeseetea.malariacare.database.utils.feedback.Feedback;
 import org.eyeseetea.malariacare.database.utils.feedback.FeedbackBuilder;
-import org.eyeseetea.malariacare.database.utils.feedback.DashboardSentBundle;
 import org.eyeseetea.malariacare.database.utils.planning.PlannedItemBuilder;
+import org.eyeseetea.malariacare.database.utils.planning.PlannedServiceBundle;
 import org.eyeseetea.malariacare.layout.score.ScoreRegister;
-import org.eyeseetea.malariacare.utils.Utils;
 import org.eyeseetea.malariacare.utils.Constants;
+import org.eyeseetea.malariacare.utils.Utils;
 
 import java.util.HashMap;
 import java.util.List;
@@ -122,10 +124,12 @@ public class SurveyService extends IntentService {
      * Key of tabs entry in shared session
      */
     public static final String PREPARE_SURVEY_ACTION_TABS ="org.eyeseetea.malariacare.services.SurveyService.PREPARE_SURVEY_ACTION_TABS";
+
     /**
      * Key of tabs entry in shared session
      */
     public static final String PREPARE_ALL_TABS ="org.eyeseetea.malariacare.services.SurveyService.PREPARE_ALL_TABS";
+
     /**
      * Key of programs entry in shared session
      */
@@ -244,7 +248,11 @@ public class SurveyService extends IntentService {
 
     private void reloadPlannedSurveys() {
         Log.d(TAG, "reloadPlanningSurveys");
-        Session.putServiceValue(PLANNED_SURVEYS_ACTION, PlannedItemBuilder.getInstance().buildPlannedItems());
+        PlannedServiceBundle plannedServiceBundle = new PlannedServiceBundle();
+        plannedServiceBundle.setPlannedItems(PlannedItemBuilder.getInstance().buildPlannedItems());
+        plannedServiceBundle.setOrgUnits(OrgUnit.getAllOrgUnit());
+        plannedServiceBundle.setPrograms(Program.getAllPrograms());
+        Session.putServiceValue(PLANNED_SURVEYS_ACTION, plannedServiceBundle);
         //Returning result to anyone listening
         LocalBroadcastManager.getInstance(this).sendBroadcast(new Intent(PLANNED_SURVEYS_ACTION));
     }
@@ -271,18 +279,14 @@ public class SurveyService extends IntentService {
 
     private void getAllOrgUnitsAndPrograms() {
         Log.d(TAG,"getAllOrgUnitAndPrograms (Thread:"+Thread.currentThread().getId()+")");
-        List<OrgUnit> orgUnitList=OrgUnit.getAllOrgUnit();
-        List<Program> programList=Program.getAllPrograms();
 
-        HashMap<String,List> orgUnitsAndPrograms=new HashMap<>();
-        orgUnitsAndPrograms.put(PREPARE_ORG_UNIT, orgUnitList);
-        orgUnitsAndPrograms.put(PREPARE_PROGRAMS, programList);
+        DashboardSentBundle sentDashboardBundle = new DashboardSentBundle();
+        sentDashboardBundle.setSentSurveys(Survey.getAllSentCompletedOrConflictSurveys());
+        sentDashboardBundle.setOrgUnits(OrgUnit.getAllOrgUnit());
+        sentDashboardBundle.setPrograms(Program.getAllPrograms());
+
         //Since intents does NOT admit NON serializable as values we use Session instead
-        Session.putServiceValue(ALL_ORG_UNITS_AND_PROGRAMS_ACTION, orgUnitsAndPrograms);
-
-        //Returning result to anyone listening
-        Intent resultIntent= new Intent(ALL_ORG_UNITS_AND_PROGRAMS_ACTION);
-        LocalBroadcastManager.getInstance(this).sendBroadcast(resultIntent);
+        Session.putServiceValue(ALL_ORG_UNITS_AND_PROGRAMS_ACTION, sentDashboardBundle);
 
     }
 
@@ -343,7 +347,6 @@ public class SurveyService extends IntentService {
         Log.d(TAG, "reloadDashboard");
         List<OrgUnit> orgUnitListParents = new Select().all().from(OrgUnit.class).where(Condition.column(OrgUnit$Table.ID_PARENT).isNull()).queryList();
         List<OrgUnitLevel> orgUnitLevelList = new Select().all().from(OrgUnitLevel.class).queryList();
-        List<OrgUnit> orgUnitList=OrgUnit.getAllOrgUnit();
         List<Survey> completedUnsentSurveys=Survey.getAllCompletedUnsentSurveys();
         List<Survey> unsentSurveys=Survey.getAllInProgressSurveys();
         for(Survey survey:unsentSurveys){
@@ -366,7 +369,6 @@ public class SurveyService extends IntentService {
         Session.putServiceValue(ALL_IN_PROGRESS_SURVEYS_ACTION, unsentSurveys);
         Session.putServiceValue(ALL_SENT_OR_COMPLETED_OR_CONFLICT_SURVEYS_ACTION, Survey.getAllSentCompletedOrConflictSurveys());
         Session.putServiceValue(ALL_COMPLETED_SURVEYS_ACTION, completedUnsentSurveys);
-        Session.putServiceValue(PLANNED_SURVEYS_ACTION, PlannedItemBuilder.getInstance().buildPlannedItems());
         Session.putServiceValue(ALL_PROGRAMS_ACTION,Program.getAllPrograms());
 
         //Returning result to anyone listening
@@ -377,7 +379,7 @@ public class SurveyService extends IntentService {
         LocalBroadcastManager.getInstance(this).sendBroadcast(new Intent(ALL_IN_PROGRESS_SURVEYS_ACTION));
         LocalBroadcastManager.getInstance(this).sendBroadcast(new Intent(ALL_SENT_OR_COMPLETED_OR_CONFLICT_SURVEYS_ACTION));
         LocalBroadcastManager.getInstance(this).sendBroadcast(new Intent(ALL_COMPLETED_SURVEYS_ACTION));
-        LocalBroadcastManager.getInstance(this).sendBroadcast(new Intent(PLANNED_SURVEYS_ACTION));
+        reloadPlannedSurveys();
     }
 
     /**
@@ -440,14 +442,15 @@ public class SurveyService extends IntentService {
 
         //register composite scores for current survey and module
         List<CompositeScore> compositeScores = CompositeScore.list();
-        ScoreRegister.registerCompositeScores(compositeScores,Session.getSurveyByModule(module).getId_survey(),module);
+        Survey survey = Session.getSurveyByModule(module);
+        ScoreRegister.registerCompositeScores(compositeScores,survey.getId_survey(),module);
 
         //Get tabs for current program & register them (scores)
         List<Tab> tabs = Tab.getTabsBySession(module);
-        List<Tab> allTabs = new Select().all().from(Tab.class).queryList();
+        List<Tab> allTabs = new Select().all().from(Tab.class).where(Condition.column(Tab$Table.ID_TAB_GROUP).eq(survey.getTabGroup().getId_tab_group())).queryList();
 
         //register tabs scores for current survey and module
-        ScoreRegister.registerTabScores(tabs, Session.getSurveyByModule(module).getId_survey(), module);
+        ScoreRegister.registerTabScores(tabs, survey.getId_survey(), module);
 
         //Since intents does NOT admit NON serializable as values we use Session instead
         Session.putServiceValue(PREPARE_SURVEY_ACTION_COMPOSITE_SCORES, compositeScores);
