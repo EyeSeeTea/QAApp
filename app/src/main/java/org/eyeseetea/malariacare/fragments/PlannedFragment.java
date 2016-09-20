@@ -19,36 +19,30 @@
 
 package org.eyeseetea.malariacare.fragments;
 
-import android.app.Activity;
 import android.app.ListFragment;
 import android.content.BroadcastReceiver;
 import android.content.Context;
 import android.content.Intent;
 import android.content.IntentFilter;
-import android.graphics.Color;
 import android.os.Bundle;
 import android.support.v4.content.LocalBroadcastManager;
 import android.util.Log;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
-import android.widget.AdapterView;
 import android.widget.Spinner;
-import android.widget.TextView;
 
+import org.eyeseetea.malariacare.DashboardActivity;
 import org.eyeseetea.malariacare.R;
 import org.eyeseetea.malariacare.database.model.OrgUnit;
 import org.eyeseetea.malariacare.database.model.Program;
-import org.eyeseetea.malariacare.database.model.Survey;
 import org.eyeseetea.malariacare.database.utils.PreferencesState;
 import org.eyeseetea.malariacare.database.utils.Session;
-import org.eyeseetea.malariacare.database.utils.feedback.DashboardSentBundle;
 import org.eyeseetea.malariacare.database.utils.planning.PlannedItem;
-import org.eyeseetea.malariacare.database.utils.planning.PlannedServiceBundle;
-import org.eyeseetea.malariacare.layout.adapters.filters.FilterOrgUnitArrayAdapter;
-import org.eyeseetea.malariacare.layout.adapters.filters.FilterProgramArrayAdapter;
+import org.eyeseetea.malariacare.database.utils.services.PlannedServiceBundle;
 import org.eyeseetea.malariacare.layout.adapters.survey.PlannedAdapter;
 import org.eyeseetea.malariacare.services.SurveyService;
+import org.eyeseetea.malariacare.views.CustomSpinner;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -56,26 +50,21 @@ import java.util.List;
 /**
  * Created by ivan.arrizabalaga on 15/12/2015.
  */
-public class PlannedFragment extends ListFragment {
+public class PlannedFragment extends ListFragment implements IModuleFragment{
     public static final String TAG = ".PlannedFragment";
 
     private PlannedItemsReceiver plannedItemsReceiver;
 
     private PlannedAdapter adapter;
 
-    private List<PlannedItem> plannedItems;
-
-    private Program programDefaultOption;
-    private OrgUnit orgUnitDefaultOption;
 
     private List<Program> programList;
     private List<OrgUnit> orgUnitList;
 
-    OnOrgUnitSelectedListener mCallback;
-    OnProgramSelectedListener mCallbackProgram;
-
+    private Program programFilter;
+    List<PlannedItem> plannedItemList;
     public PlannedFragment() {
-        this.plannedItems = new ArrayList();
+
     }
 
 
@@ -83,8 +72,6 @@ public class PlannedFragment extends ListFragment {
     public void onCreate(Bundle savedInstanceState){
         Log.d(TAG, "onCreate");
         super.onCreate(savedInstanceState);
-        programDefaultOption = new Program(getResources().getString(R.string.filter_all_org_assessments).toUpperCase());
-        orgUnitDefaultOption = new OrgUnit(getResources().getString(R.string.filter_all_org_assessments).toUpperCase());
     }
 
     @Override
@@ -104,87 +91,20 @@ public class PlannedFragment extends ListFragment {
 
     }
 
-    private void prepareUI() {
-        this.adapter = new PlannedAdapter(this.plannedItems,getActivity());
+    private void prepareUI(List<PlannedItem> plannedItemList) {
+        this.adapter = new PlannedAdapter(plannedItemList,getActivity());
         this.setListAdapter(adapter);
 
-        Spinner programSpinner = (Spinner) getActivity().findViewById(R.id.dashboard_planning_program);
-        //Populate Program View DDL
-        if(!programList.contains(programDefaultOption))
-            programList.add(0, programDefaultOption);
-        programSpinner.setAdapter(new FilterProgramArrayAdapter(getActivity(), programList));
-        //Apply filter to listview
-        programSpinner.setOnItemSelectedListener(new AdapterView.OnItemSelectedListener() {
-            @Override
-            public void onItemSelected(AdapterView<?> parent, View view, int position, long id) {
-                Spinner spinner=((Spinner) parent);
-                Program selectedProgram=position==0?null:(Program)spinner.getItemAtPosition(position);
-                ((TextView) parent.getChildAt(0)).setTextColor(Color.WHITE);
-                adapter.applyFilter(selectedProgram);
-                if(selectedProgram!=null)
-                    mCallbackProgram.OnProgramSelected(selectedProgram);
-            }
-
-            @Override
-            public void onNothingSelected(AdapterView<?> parent) {
-
-            }
-        });
-        Spinner orgUnitSpinner = (Spinner) getActivity().findViewById(R.id.dashboard_planning_orgUnit);
-
-        //Populate Program View DDL
-        if(!orgUnitList.contains(orgUnitDefaultOption))
-            orgUnitList.add(0, orgUnitDefaultOption);
-        orgUnitSpinner.setAdapter(new FilterOrgUnitArrayAdapter(getActivity(), orgUnitList));
-        //Apply filter to listview
-        orgUnitSpinner.setOnItemSelectedListener(new AdapterView.OnItemSelectedListener() {
-            @Override
-            public void onItemSelected(AdapterView<?> parent, View view, int position, long id) {
-                Spinner spinner=((Spinner) parent);
-                OrgUnit selectedOrgUnit=position==0?null:(OrgUnit)spinner.getItemAtPosition(position);
-                ((TextView) parent.getChildAt(0)).setTextColor(Color.WHITE);
-                if(selectedOrgUnit!=null && !selectedOrgUnit.getName().equals(getResources().getString(R.string.filter_all_org_assessments).toUpperCase()))
-                    mCallback.OnOrgUnitSelected(selectedOrgUnit);
-            }
-
-            @Override
-            public void onNothingSelected(AdapterView<?> parent) {
-
-            }
-        });
-    }
-    // Container Activity must implement this interface
-    public interface OnProgramSelectedListener {
-        public void OnProgramSelected(Program program);
+        reloadFilter();
     }
 
-    // Container Activity must implement this interface
-    public interface OnOrgUnitSelectedListener {
-        public void OnOrgUnitSelected(OrgUnit orgUnit);
-    }
-
-
-    @Override
-    public void onAttach(Activity activity) {
-        super.onAttach(activity);
-
-        // This makes sure that the container activity has implemented
-        // the callback interface. If not, it throws an exception
-        try {
-            mCallback = (OnOrgUnitSelectedListener) activity;
-        } catch (ClassCastException e) {
-            throw new ClassCastException(activity.toString()
-                    + " must implement OnOrgUnitSelectedListener");
+    public void reloadFilter(){
+        CustomSpinner programSpinner = (CustomSpinner) DashboardActivity.dashboardActivity.findViewById(R.id.dashboard_planning_spinner_program);
+        Program selectedProgram=(Program) programSpinner.getSelectedItem();
+        if(selectedProgram!=null) {
+            loadProgram(selectedProgram);
         }
-
-        // This makes sure that the container activity has implemented
-        // the callback interface. If not, it throws an exception
-        try {
-            mCallbackProgram = (OnProgramSelectedListener) activity;
-        } catch (ClassCastException e) {
-            throw new ClassCastException(activity.toString()
-                    + " must implement OnProgramSelectedListener");
-        }
+        adapter.notifyDataSetChanged();
     }
 
     @Override
@@ -235,16 +155,24 @@ public class PlannedFragment extends ListFragment {
         }
     }
 
-    public void reloadPlannedItems(List<PlannedItem> plannedItemList) {
-        adapter.reloadItems(plannedItemList);
-        setListShown(true);
-    }
-
+    @Override
     public void reloadData(){
         //Reload data using service
         Intent surveysIntent=new Intent(PreferencesState.getInstance().getContext().getApplicationContext(), SurveyService.class);
         surveysIntent.putExtra(SurveyService.SERVICE_METHOD, SurveyService.PLANNED_SURVEYS_ACTION);
         PreferencesState.getInstance().getContext().getApplicationContext().startService(surveysIntent);
+    }
+
+    public void loadProgram(Program program) {
+        Log.d(TAG,"Loading program: "+program.getUid());
+        programFilter=program;
+        if(adapter!=null){
+            adapter.applyFilter(programFilter);
+            adapter.notifyDataSetChanged();
+        }
+        else {
+            reloadData();
+        }
     }
 
     /**
@@ -260,11 +188,23 @@ public class PlannedFragment extends ListFragment {
             //Listening only intents from this method
             if(SurveyService.PLANNED_SURVEYS_ACTION.equals(intent.getAction())){
                 PlannedServiceBundle plannedServiceBundle= (PlannedServiceBundle)Session.popServiceValue(SurveyService.PLANNED_SURVEYS_ACTION);
-                programList=plannedServiceBundle.getPrograms();
-                orgUnitList=plannedServiceBundle.getOrgUnits();
-                prepareUI();
-                reloadPlannedItems(plannedServiceBundle.getPlannedItems());
+                //Create the filters only the first time
+                if(programList==null && orgUnitList ==null) {
+                    createFilters(plannedServiceBundle);
+                }
+                prepareUI(plannedServiceBundle.getPlannedItems());
+
+                setListShown(true);
+                adapter.notifyDataSetChanged();
             }
         }
+
+        private void createFilters(PlannedServiceBundle plannedServiceBundle) {
+            programList=(List<Program>) plannedServiceBundle.getModelList(Program.class.getName());
+            orgUnitList=(List<OrgUnit>) plannedServiceBundle.getModelList(OrgUnit.class.getName());
+            DashboardActivity.dashboardActivity.preparePlanningFilters(programList,orgUnitList);
+        }
+
+
     }
 }

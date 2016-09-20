@@ -21,6 +21,9 @@ package org.eyeseetea.malariacare.database.iomodules.dhis.importer;
 
 import android.util.Log;
 
+import com.raizlabs.android.dbflow.runtime.transaction.process.ProcessModelInfo;
+import com.raizlabs.android.dbflow.runtime.transaction.process.SaveModelTransaction;
+
 import org.eyeseetea.malariacare.ProgressActivity;
 import org.eyeseetea.malariacare.R;
 import org.eyeseetea.malariacare.database.iomodules.dhis.importer.models.DataElementExtended;
@@ -36,15 +39,14 @@ import org.eyeseetea.malariacare.database.iomodules.dhis.importer.models.Program
 import org.eyeseetea.malariacare.database.iomodules.dhis.importer.models.UserAccountExtended;
 import org.eyeseetea.malariacare.database.model.Answer;
 import org.eyeseetea.malariacare.database.model.CompositeScore;
-import org.eyeseetea.malariacare.database.model.ControlDataElement;
+import org.eyeseetea.malariacare.database.model.Media;
+import org.eyeseetea.malariacare.database.model.ServerMetadata;
 import org.eyeseetea.malariacare.database.model.OrgUnit;
 import org.eyeseetea.malariacare.database.model.OrgUnitLevel;
 import org.eyeseetea.malariacare.database.model.OrgUnitProgramRelation;
 import org.eyeseetea.malariacare.database.model.Question;
-import org.eyeseetea.malariacare.database.model.Score;
 import org.eyeseetea.malariacare.database.model.Survey;
 import org.eyeseetea.malariacare.database.model.Tab;
-import org.eyeseetea.malariacare.database.model.TabGroup;
 import org.eyeseetea.malariacare.database.model.User;
 import org.eyeseetea.malariacare.database.model.Value;
 import org.eyeseetea.malariacare.database.utils.PreferencesState;
@@ -64,7 +66,7 @@ import org.hisp.dhis.android.sdk.persistence.models.ProgramStageSection;
 import org.hisp.dhis.android.sdk.persistence.models.UserAccount;
 import org.hisp.dhis.android.sdk.utils.api.ProgramType;
 
-import java.text.ParseException;
+import java.util.ArrayList;
 import java.util.Date;
 import java.util.HashMap;
 import java.util.List;
@@ -80,17 +82,37 @@ public class ConvertFromSDKVisitor implements IConvertFromSDKVisitor {
      */
     CompositeScoreBuilder compositeScoreBuilder;
     QuestionBuilder questionBuilder;
-    private final String ATTRIBUTE_PRODUCTIVITY_CODE="OUProductivity";
-    private final String SDKDateFormat="yyyy-MM-dd'T'HH:mm:ss.SSSZ";
-
+    List<Question> questions;
 
     public ConvertFromSDKVisitor(){
         appMapObjects = new HashMap();
         compositeScoreBuilder = new CompositeScoreBuilder();
         questionBuilder = new QuestionBuilder();
+        questions = new ArrayList<>();
 
         //Reload static dataElement codes
         DataElementExtended.reloadDataElementTypeCodes();
+    }
+
+    public void saveBatch(){
+        //Save questions in batch
+        new SaveModelTransaction<>(ProcessModelInfo.withModels(questions)).onExecute();
+
+        //Refresh media references
+        List<Media> medias = questionBuilder.getListMedia();
+        for(Media media: medias){
+            media.updateQuestion();
+        }
+        //Save media in batch
+        new SaveModelTransaction<>(ProcessModelInfo.withModels(medias)).onExecute();
+    }
+
+    public List<Question> getQuestions() {
+        return questions;
+    }
+
+    public void setQuestions(List<Question> questions) {
+        this.questions = questions;
     }
 
     /**
@@ -121,18 +143,14 @@ public class ConvertFromSDKVisitor implements IConvertFromSDKVisitor {
      */
     @Override
     public void visit(ProgramStageExtended sdkProgramStageExtended) {
-        //Build tabgroup
+        //Build Program
         ProgramStage programStage=sdkProgramStageExtended.getProgramStage();
-        org.eyeseetea.malariacare.database.model.Program appProgram=(org.eyeseetea.malariacare.database.model.Program)appMapObjects.get(programStage.getProgram().getUid());
-        TabGroup appTabGroup = new TabGroup();
-        //FIXME TabGroup has no UID right now
-        appTabGroup.setName(programStage.getDisplayName());
-        appTabGroup.setProgram(appProgram);
-        appTabGroup.setUid(programStage.getUid());
-        appTabGroup.save();
+        String sdkProgramUID = programStage.getProgram().getUid();
+        org.eyeseetea.malariacare.database.model.Program appProgram = (org.eyeseetea.malariacare.database.model.Program) appMapObjects.get(sdkProgramUID);
+        appProgram.setStageUid(programStage.getUid());
+        appProgram.update();
 
-        //Annotate built tabgroup
-        appMapObjects.put(programStage.getUid(), appTabGroup);
+        appMapObjects.put(appProgram.getUid(),appProgram);
 
         //Visit children
         for(ProgramStageSection pss:programStage.getProgramStageSections()){
@@ -197,16 +215,15 @@ public class ConvertFromSDKVisitor implements IConvertFromSDKVisitor {
         //Build Tab
 
         ProgramStageSection programStageSection=sdkProgramStageSectionExtended.getProgramStageSection();
-        org.eyeseetea.malariacare.database.model.TabGroup appTabGroup=(org.eyeseetea.malariacare.database.model.TabGroup)appMapObjects.get(programStageSection.getProgramStage());
+        String programUID = (ProgramStageExtended.getProgramStage(programStageSection.getProgramStage())).getProgram().getUid();
+        org.eyeseetea.malariacare.database.model.Program program = (org.eyeseetea.malariacare.database.model.Program)appMapObjects.get(programUID);
         Tab appTab = new Tab();
-        //FIXME TabGroup has no UID right now
+        appTab.setProgram(program);
         appTab.setName(programStageSection.getDisplayName());
         appTab.setType(Constants.TAB_AUTOMATIC);
         appTab.setOrder_pos(programStageSection.getSortOrder());
-        appTab.setTabGroup(appTabGroup);
         appTab.save();
         //Annotate build tab
-        appMapObjects.put(appTab.getClass() + appTab.getName(), appTab);
         appMapObjects.put(programStageSection.getUid(), appTab);
     }
 
@@ -243,6 +260,7 @@ public class ConvertFromSDKVisitor implements IConvertFromSDKVisitor {
         Answer appAnswer=(Answer)appMapObjects.get(sdkOption.getOptionSet());
         org.eyeseetea.malariacare.database.model.Option appOption= new org.eyeseetea.malariacare.database.model.Option();
         appOption.setName(sdkOption.getName());
+        appOption.setUid(sdkOption.getUid());
         appOption.setCode(sdkOption.getCode());
         appOption.setAnswer(appAnswer);
         appOption.setFactor(sdkOptionExtended.getFactor());
@@ -259,7 +277,6 @@ public class ConvertFromSDKVisitor implements IConvertFromSDKVisitor {
         User appUser = new User();
         appUser.setUid(userAccount.getUId());
         appUser.setName(userAccount.getName());
-        appUser.setUsername(userAccount.getUsername());
         appUser.save();
     }
 
@@ -271,20 +288,21 @@ public class ConvertFromSDKVisitor implements IConvertFromSDKVisitor {
     @Override
     public void visit(DataElementExtended sdkDataElementExtended) {
         Object questionOrCompositeScore;
-        if(appMapObjects.containsKey(sdkDataElementExtended.getDataElement().getUid()))
-            return;
         if(sdkDataElementExtended.isCompositeScore()){
             questionOrCompositeScore=buildCompositeScore(sdkDataElementExtended);
         }else if(sdkDataElementExtended.isQuestion()){
             questionOrCompositeScore=buildQuestion(sdkDataElementExtended);
             //Question type is annotated in 'answer' from an attribute of the question
         }else if (sdkDataElementExtended.isControlDataElement()) {
+            //The controlDataelements should be unique and only needs be saved one time
+            if(appMapObjects.containsKey(sdkDataElementExtended.getDataElement().getUid()+sdkDataElementExtended.getProgramUid()))
+                return;
             questionOrCompositeScore=buildControlDataElement(sdkDataElementExtended);
         } else {
             Log.d(TAG, "Error" + sdkDataElementExtended.getDataElement().toString());
             return;
         }
-        appMapObjects.put(sdkDataElementExtended.getDataElement().getUid(), questionOrCompositeScore);
+        appMapObjects.put(sdkDataElementExtended.getDataElement().getUid()+sdkDataElementExtended.getProgramUid(), questionOrCompositeScore);
         //Both questions and scores are annotated
     }
 
@@ -296,89 +314,73 @@ public class ConvertFromSDKVisitor implements IConvertFromSDKVisitor {
     public void visit(EventExtended sdkEventExtended) {
         Event event=sdkEventExtended.getEvent();
         OrgUnit orgUnit =(OrgUnit)appMapObjects.get(event.getOrganisationUnitId());
-        TabGroup tabGroup=(TabGroup)appMapObjects.get(event.getProgramStageId());
-
+        org.eyeseetea.malariacare.database.model.Program program = (org.eyeseetea.malariacare.database.model.Program)appMapObjects.get(ProgramStageExtended.getProgramStage(event.getProgramStageId()).getProgram().getUid());
         Survey survey=new Survey();
         //Any survey that comes from the pull has been sent
         survey.setStatus(Constants.SURVEY_SENT);
-        //Set dates
+        //Completiondate == Event date
         survey.setCompletionDate(sdkEventExtended.getEventDate());
-        //This prevent a null dates, but the CreationDation and UploadedDate need be setted in dataValue visitor.
-        survey.setCreationDate(sdkEventExtended.getEventDate());
-        survey.setUploadedDate(sdkEventExtended.getEventDate());
 
-        survey.setScheduledDate(sdkEventExtended.getScheduledDate());
+        //Set dates( to prevent a null value, all take the getEventDate date before datavalue visitor)
+        survey.setCreationDate(sdkEventExtended.getEventDate());
+        survey.setUploadDate(sdkEventExtended.getEventDate());
+        //Scheduled date == Due date
+        survey.setScheduledDate(sdkEventExtended.getDueDate());
         //Set fks
         survey.setOrgUnit(orgUnit);
-        survey.setTabGroup(tabGroup);
         survey.setEventUid(event.getUid());
+        survey.setProgram(program);
         survey.save();
 
         //Annotate object in map
-        appMapObjects.put(event.getUid(), survey);
+        EventToSurveyBuilder eventToSurveyBuilder=new EventToSurveyBuilder(survey);
+        appMapObjects.put(event.getUid(), eventToSurveyBuilder);
 
         //Visit its values
         for(DataValue dataValue:event.getDataValues()){
             DataValueExtended dataValueExtended=new DataValueExtended(dataValue);
+            dataValueExtended.setProgramUid(event.getProgramId());
             dataValueExtended.accept(this);
         }
+        //Once all the values are processed save common data across created surveys
+        eventToSurveyBuilder.saveCommonData();
     }
 
     @Override
     public void visit(DataValueExtended sdkDataValueExtended) {
 
         DataValue dataValue=sdkDataValueExtended.getDataValue();
-        Survey survey=(Survey)appMapObjects.get(dataValue.getEvent());
-        //Data value is a value from compositeScore
-        if(appMapObjects.get(dataValue.getDataElement()) instanceof CompositeScore){
-            //CHeck if it is a root score -> score
-            CompositeScore compositeScore = (CompositeScore)appMapObjects.get(dataValue.getDataElement());
-            if(CompositeScoreBuilder.ROOT_NODE_CODE.equals(compositeScore.getHierarchical_code())){
-                Score score = new Score();
-                score.setScore(Float.parseFloat(dataValue.getValue()));
-                score.setUid(dataValue.getDataElement());
-                score.setSurvey(survey);
-                score.save();
-            }
+        EventToSurveyBuilder eventToSurveyBuilder =(EventToSurveyBuilder) appMapObjects.get(dataValue.getEvent());
+
+        //General common data (mainscore, createdby, createdon, uploadedon..)
+
+        //-> mainScore
+        if(appMapObjects.get(dataValue.getDataElement()+sdkDataValueExtended.getProgramUid()) instanceof CompositeScore){
+            CompositeScore compositeScore = (CompositeScore)appMapObjects.get(dataValue.getDataElement()+sdkDataValueExtended.getProgramUid());
+            //Only mainScores are annotated
+            eventToSurveyBuilder.setMainScore(compositeScore,dataValue);
+            Log.i(TAG,String.format("Event %s with mainScore %s",eventToSurveyBuilder.getEventUid(),dataValue.getValue()));
             return;
         }
 
+        //-> createdOn
         if(dataValue.getDataElement().equals(PreferencesState.getInstance().getContext().getResources().getString(R.string.created_on_code))){
-            try{
-                Date date = EventExtended.parseDate(dataValue.getValue(),EventExtended.AMERICAN_DATE_FORMAT);
-                survey.setCreationDate(date);
-                survey.save();
-                //Annotate object in map
-                appMapObjects.put(dataValue.getEvent(), survey);
-            }catch(ParseException e){
-                Log.d(TAG,"Error converting creation date from datavalue in survey: "+survey.getId_survey());
-            }
+            eventToSurveyBuilder.setCreatedOn(dataValue);
+            Log.i(TAG,String.format("Event %s created on %s",eventToSurveyBuilder.getEventUid(),dataValue.getValue()));
             return;
         }
 
-        if(dataValue.getDataElement().equals(PreferencesState.getInstance().getContext().getResources().getString(R.string.upload_date_code))){
-            try{
-                Date date = EventExtended.parseDate(dataValue.getValue(),EventExtended.AMERICAN_DATE_FORMAT);
-                survey.setUploadedDate(date);
-                survey.save();
-                //Annotate object in map
-                appMapObjects.put(dataValue.getEvent(), survey);
-            }catch(ParseException e){
-                Log.d(TAG,"Error converting upload date from datavalue in survey:"+survey.getId_survey());
-            }
+        //-> uploadedOn
+        /*if(dataValue.getDataElement().equals(PreferencesState.getInstance().getContext().getResources().getString(R.string.upload_on_code))){
+            eventToSurveyBuilder.setUploadedOn(dataValue);
+            Log.i(TAG,String.format("Event %s uploaded on %s",eventToSurveyBuilder.getEventUid(),dataValue.getValue()));
             return;
-        }
+        }*/
 
+        //-> uploadedBy (updatedBy is ignored)
         if(dataValue.getDataElement().equals(PreferencesState.getInstance().getContext().getResources().getString(R.string.uploaded_by_code))){
-            User user=User.getUser(dataValue.getValue());
-            if(user==null) {
-                user = new User(dataValue.getValue(), dataValue.getValue());
-                user.save();
-            }
-            survey.setUser(user);
-            survey.save();
-            //Annotate object in map
-            appMapObjects.put(dataValue.getEvent(), survey);
+            eventToSurveyBuilder.setUploadedBy(dataValue);
+            Log.i(TAG,String.format("Event %s created by %s",eventToSurveyBuilder.getEventUid(),dataValue.getValue()));
             return;
         }
 
@@ -386,7 +388,7 @@ public class ConvertFromSDKVisitor implements IConvertFromSDKVisitor {
         //Datavalue is a value from a question
         org.eyeseetea.malariacare.database.model.Option option = null;
         try{
-            Question question=(Question)appMapObjects.get(dataValue.getDataElement());
+            Question question=(Question)appMapObjects.get(dataValue.getDataElement()+sdkDataValueExtended.getProgramUid());
             value.setQuestion(question);
             option=sdkDataValueExtended.findOptionByQuestion(question);
             value.setOption(option);
@@ -394,14 +396,15 @@ public class ConvertFromSDKVisitor implements IConvertFromSDKVisitor {
             Log.d(TAG,"Ignoring controlDataelement in DataValue converting");
         }
 
-        value.setSurvey(survey);
+        value.setSurvey(eventToSurveyBuilder.getDefaultSurvey());
         //No option -> text question (straight value)
         if(option==null){
             value.setValue(dataValue.getValue());
         }else{
-        //Option -> extract value from code
+            //Option -> extract value from code
             value.setValue(option.getName());
         }
+        value.setUploadDate(new Date());
         value.save();
     }
 
@@ -422,6 +425,8 @@ public class ConvertFromSDKVisitor implements IConvertFromSDKVisitor {
         appQuestion.setOrder_pos(dataElementExtended.findOrder());
         appQuestion.setNumerator_w(dataElementExtended.findNumerator());
         appQuestion.setDenominator_w(dataElementExtended.findDenominator());
+        appQuestion.setRow(dataElementExtended.findRow());
+        appQuestion.setColumn(dataElementExtended.findColumn());
         appQuestion.setOutput(compositeScoreBuilder.findAnswerOutput(dataElementExtended));
 
         //Label does not have an optionset
@@ -433,12 +438,13 @@ public class ConvertFromSDKVisitor implements IConvertFromSDKVisitor {
             appQuestion.setAnswer(buildAnswerLabel());
         }
 
-        ProgramStageDataElement programStageDataElement = DataElementExtended.findProgramStageDataElementByDataElementUID(dataElement.getUid());
+        ProgramStageDataElement programStageDataElement = DataElementExtended.findProgramStageDataElementByDataElementExtended(dataElementExtended);
         appQuestion.setCompulsory(programStageDataElement.getCompulsory());
-        appQuestion.setHeader(questionBuilder.saveHeader(dataElementExtended));
+        appQuestion.setHeader(questionBuilder.findOrSaveHeader(dataElementExtended,appMapObjects));
         questionBuilder.registerParentChildRelations(dataElementExtended);
-        appQuestion.save();
-        questionBuilder.add(appQuestion);
+        questionBuilder.attachMedia(dataElementExtended, appQuestion);
+        questions.add(appQuestion);
+        questionBuilder.add(appQuestion, dataElementExtended.getProgramUid());
         return appQuestion;
     }
 
@@ -486,15 +492,16 @@ public class ConvertFromSDKVisitor implements IConvertFromSDKVisitor {
         //Parent score and Order can only be set once every score in saved
         compositeScore.save();
 
-        compositeScoreBuilder.add(compositeScore);
+        compositeScoreBuilder.add(compositeScore, sdkDataElementExtended.getProgramUid());
+
         return compositeScore;
     }
 
 
 
-    private ControlDataElement buildControlDataElement(DataElementExtended sdkDataElementExtended) {
+    private ServerMetadata buildControlDataElement(DataElementExtended sdkDataElementExtended) {
         DataElement dataElement=sdkDataElementExtended.getDataElement();
-        ControlDataElement controlDataElement = new ControlDataElement();
+        ServerMetadata controlDataElement = new ServerMetadata();
         controlDataElement.setUid(dataElement.getUid());
         controlDataElement.setCode(dataElement.getCode());
         controlDataElement.setName(dataElement.getDisplayName());

@@ -102,6 +102,12 @@ public class Question extends BaseModel {
     @Column
     Long id_composite_score;
 
+    @Column
+    Integer row;
+
+    @Column
+    Integer column;
+
     /**
      * Reference to associated compositeScore for this question (loaded lazily)
      */
@@ -142,7 +148,7 @@ public class Question extends BaseModel {
     public Question() {
     }
 
-    public Question(String code, String de_name, String short_name, String form_name, String uid, Integer order_pos, Float numerator_w, Float denominator_w, String feedback, Integer output,Header header, Answer answer, Question question, CompositeScore compositeScore,Boolean compulsory) {
+    public Question(String code, String de_name, String short_name, String form_name, String uid, Integer order_pos, Float numerator_w, Float denominator_w, String feedback, Integer output,Header header, Answer answer, Question question, CompositeScore compositeScore,Boolean compulsory,Integer row, Integer column) {
         this.code = code;
         this.de_name = de_name;
         this.short_name = short_name;
@@ -156,6 +162,8 @@ public class Question extends BaseModel {
         this.parent = null;
         this.matchTrigger=null;
         this.compulsory=compulsory;
+        this.row = row;
+        this.column = column;
 
         this.setHeader(header);
         this.setAnswer(answer);
@@ -249,6 +257,22 @@ public class Question extends BaseModel {
 
     public Boolean getCompulsory() {
         return compulsory;
+    }
+
+    public void setRow(Integer row){
+        this.row = row;
+    }
+
+    public Integer getRow(){
+        return this.row;
+    }
+
+    public void setColumn(Integer column){
+        this.column = column;
+    }
+
+    public Integer getColumn(){
+        return this.column;
     }
 
     public Header getHeader() {
@@ -378,19 +402,6 @@ public class Question extends BaseModel {
         return matchTrigger;
     }
 
-    /**
-     * Returns the question whose answer will be triggered according to this question's answer via a match relationship
-     * @return
-     */
-//    public Question getQuestionTriggered(){
-//        //Never try-> load
-//        if(matchTrigger==null){
-//            hasAMatchTrigger();
-//        }
-//
-//        return questionTriggered;
-//    }
-
     public List<QuestionRelation> getQuestionRelations() {
         if(questionRelations ==null){
             this.questionRelations = new Select()
@@ -407,19 +418,6 @@ public class Question extends BaseModel {
         return !this.getQuestionRelations().isEmpty();
     }
 
-//    public List<QuestionOption> getQuestionOption() {
-//        //if (this.children == null){
-//        return new Select().from(QuestionOption.class)
-//                .indexedBy("QuestionOption_id_question")
-//                .where(Condition.column(QuestionOption$Table.ID_QUESTION).eq(this.getId_question()))
-//                .queryList();
-//        //}
-//    }
-
-//    public boolean hasQuestionOption() {
-//        return !this.getQuestionOption().isEmpty();
-//    }
-
     public List<Match> getMatches() {
         if (matches == null) {
             matches = new Select().from(Match.class).as("m")
@@ -435,6 +433,7 @@ public class Question extends BaseModel {
     public List<Question> getChildren() {
         if (this.children == null) {
 
+            //No matches no children
             List<Match> matches = getMatches();
             if (matches.size() == 0) {
                 this.children = new ArrayList<>();
@@ -534,10 +533,27 @@ public class Question extends BaseModel {
     }
 
 
-    /*Returns true if the question belongs to a Custom Tab*/
+    /**
+     * Returns true if the question belongs to a Custom Tab
+     * */
     public boolean belongsToCustomTab() {
+        return this.row!=null || this.column!=null;
+    }
 
-        return getHeader().getTab().isACustomTab();
+    /**
+     * Returns true if this question is a title of a custom Tab table
+     * @return
+     */
+    public boolean isCustomTabTableHeader(){
+        return this.row!=null && this.row==0;
+    }
+
+    /**
+     * Returns true if this question starts a new row
+     * @return
+     */
+    public boolean isCustomTabNewRow(){
+        return this.column!=null && this.column==1;
     }
 
     /**
@@ -591,30 +607,7 @@ public class Question extends BaseModel {
         if(question==null)
             return false;
 
-        Long id_question=question.getId_question();
-        long hasParentOptionActivated = new Select().count().from(Value.class).as("v")
-                .join(QuestionOption.class, Join.JoinType.LEFT).as("qo")
-                .on(
-                        Condition.column(ColumnAlias.columnWithTable("v", Value$Table.ID_QUESTION))
-                                .eq(ColumnAlias.columnWithTable("qo", QuestionOption$Table.ID_QUESTION)),
-                        Condition.column(ColumnAlias.columnWithTable("v", Value$Table.ID_OPTION))
-                                .eq(ColumnAlias.columnWithTable("qo", QuestionOption$Table.ID_OPTION)))
-                .join(Match.class, Join.JoinType.LEFT).as("m")
-                .on(
-                        Condition.column(ColumnAlias.columnWithTable("qo", QuestionOption$Table.ID_MATCH))
-                                .eq(ColumnAlias.columnWithTable("m", Match$Table.ID_MATCH)))
-                .join(QuestionRelation.class, Join.JoinType.LEFT).as("qr")
-                .on(
-                        Condition.column(ColumnAlias.columnWithTable("m", Match$Table.ID_QUESTION_RELATION))
-                                .eq(ColumnAlias.columnWithTable("qr", QuestionRelation$Table.ID_QUESTION_RELATION)))
-                //Parent child relationship
-                .where(Condition.column(ColumnAlias.columnWithTable("qr", QuestionRelation$Table.OPERATION)).eq(1))
-                //For the given survey
-                .and(Condition.column(ColumnAlias.columnWithTable("v", Value$Table.ID_SURVEY)).eq(id_survey))
-                //The child question in the relationship is 'this'
-                .and(Condition.column(ColumnAlias.columnWithTable("qr", QuestionRelation$Table.ID_QUESTION)).eq(id_question))
-                .count();
-        return hasParentOptionActivated > 0 ? false : true;
+        return question.isHiddenBySurvey(id_survey);
     }
 
     /**
@@ -639,11 +632,11 @@ public class Question extends BaseModel {
     /**
      * Counts the number of required questions (without a parent question).
      *
-     * @param tabGroup
+     * @param program
      * @return
      */
-    public static int countRequiredByProgram(TabGroup tabGroup) {
-        if (tabGroup == null || tabGroup.getId_tab_group() == null) {
+    public static int countRequiredByProgram(Program program) {
+        if (program == null || program.getId_program() == null) {
             return 0;
         }
 
@@ -657,7 +650,7 @@ public class Question extends BaseModel {
                 .on(Condition.column(ColumnAlias.columnWithTable("h", Header$Table.ID_TAB))
                         .eq(ColumnAlias.columnWithTable("t", Tab$Table.ID_TAB)))
                 .where(Condition.column(ColumnAlias.columnWithTable("q", Question$Table.OUTPUT)).isNot(Constants.NO_ANSWER))
-                .and(Condition.column(ColumnAlias.columnWithTable("t", Tab$Table.ID_TAB_GROUP)).eq(tabGroup.getId_tab_group())).count();
+                .and(Condition.column(ColumnAlias.columnWithTable("t", Tab$Table.ID_PROGRAM)).eq(program.getId_program())).count();
 
         // Count children questions from the given taggroup
         long numChildrenQuestion = new Select().count()
@@ -672,7 +665,7 @@ public class Question extends BaseModel {
                 .on(Condition.column(ColumnAlias.columnWithTable("h", Header$Table.ID_TAB))
                         .eq(ColumnAlias.columnWithTable("t", Tab$Table.ID_TAB)))
                 .where(Condition.column(ColumnAlias.columnWithTable("q", Question$Table.OUTPUT)).isNot(Constants.NO_ANSWER))
-                .and(Condition.column(ColumnAlias.columnWithTable("t", Tab$Table.ID_TAB_GROUP)).eq(tabGroup.getId_tab_group()))
+                .and(Condition.column(ColumnAlias.columnWithTable("t", Tab$Table.ID_PROGRAM)).eq(program.getId_program()))
                 .and(Condition.column(ColumnAlias.columnWithTable("qr", QuestionRelation$Table.OPERATION)).eq(Constants.OPERATION_TYPE_PARENT)).count();
 
         // Return number of parents (total - children)
@@ -682,11 +675,11 @@ public class Question extends BaseModel {
     /**
      * Counts the number of compulsory questions (without a parent question).
      *
-     * @param tabGroup
+     * @param program
      * @return
      */
-    public static int countCompulsoryByProgram(TabGroup tabGroup) {
-        if (tabGroup == null || tabGroup.getId_tab_group() == null) {
+    public static int countCompulsoryByProgram(Program program) {
+        if (program == null || program.getId_program() == null) {
             return 0;
         }
 
@@ -700,12 +693,11 @@ public class Question extends BaseModel {
                 .on(Condition.column(ColumnAlias.columnWithTable("h", Header$Table.ID_TAB))
                         .eq(ColumnAlias.columnWithTable("t", Tab$Table.ID_TAB)))
                 .where(Condition.column(ColumnAlias.columnWithTable("q", Question$Table.COMPULSORY)).is(true))
-                .and(Condition.column(ColumnAlias.columnWithTable("t", Tab$Table.ID_TAB_GROUP)).eq(tabGroup.getId_tab_group())).count();
+                .and(Condition.column(ColumnAlias.columnWithTable("t", Tab$Table.ID_PROGRAM)).eq(program.getId_program())).count();
 
-        // Count children questions from the given taggroup
-        long numChildrenQuestion = new Select().count()
-                .from(QuestionRelation.class).as("qr")
-                .join(Question.class, Join.JoinType.LEFT).as("q")
+        List<Question> questionsChild = new Select()
+                .from(Question.class).as("q")
+                .join(QuestionRelation.class, Join.JoinType.LEFT).as("qr")
                 .on(Condition.column(ColumnAlias.columnWithTable("qr", QuestionRelation$Table.ID_QUESTION))
                         .eq(ColumnAlias.columnWithTable("q", Question$Table.ID_QUESTION)))
                 .join(Header.class, Join.JoinType.LEFT).as("h")
@@ -715,11 +707,11 @@ public class Question extends BaseModel {
                 .on(Condition.column(ColumnAlias.columnWithTable("h", Header$Table.ID_TAB))
                         .eq(ColumnAlias.columnWithTable("t", Tab$Table.ID_TAB)))
                 .where(Condition.column(ColumnAlias.columnWithTable("q", Question$Table.COMPULSORY)).is(true))
-                .and(Condition.column(ColumnAlias.columnWithTable("t", Tab$Table.ID_TAB_GROUP)).eq(tabGroup.getId_tab_group()))
-                .and(Condition.column(ColumnAlias.columnWithTable("qr", QuestionRelation$Table.OPERATION)).eq(Constants.OPERATION_TYPE_PARENT)).count();
-
+                .and(Condition.column(ColumnAlias.columnWithTable("t", Tab$Table.ID_PROGRAM)).eq(program.getId_program()))
+                .and(Condition.column(ColumnAlias.columnWithTable("qr", QuestionRelation$Table.OPERATION))
+                        .eq(Constants.OPERATION_TYPE_PARENT)).groupBy(ColumnAlias.columnWithTable("q", Question$Table.UID)).queryList();
         // Return number of parents (total - children)
-        return (int) (totalAnswerableQuestions-numChildrenQuestion);
+        return (int) (totalAnswerableQuestions-questionsChild.size());
     }
 
     /**
@@ -762,12 +754,12 @@ public class Question extends BaseModel {
         //checks if the children questions are active by UID
         // Note: the question id_question is wrong because dbflow query overwrites the children id_question with the parent id_question.
         for(Question question:questions) {
-            if(!Question.isHiddenQuestionByUidAndSurvey(question.getUid(), id_survey)) {
+            if(question.getCompulsory() && !Question.isHiddenQuestionByUidAndSurvey(question.getUid(), id_survey)) {
                 numActiveChildrens++;
             }
         }
         // Return number of active compulsory children
-        return (int) (numActiveChildrens);
+        return numActiveChildrens;
     }
 
 
@@ -830,11 +822,11 @@ public class Question extends BaseModel {
     /**
      * Returns all the questions that belongs to a program
      *
-     * @param tabGroup
+     * @param program
      * @return
      */
-    public static List<Question> listByTabGroup(TabGroup tabGroup) {
-        if (tabGroup == null || tabGroup.getId_tab_group() == null) {
+    public static List<Question> listByProgram(Program program) {
+        if (program == null || program.getId_program() == null) {
             return new ArrayList();
         }
 
@@ -849,11 +841,8 @@ public class Question extends BaseModel {
                 .join(Tab.class, Join.JoinType.LEFT).as("t")
                 .on(Condition.column(ColumnAlias.columnWithTable("h", Header$Table.ID_TAB))
                         .eq(ColumnAlias.columnWithTable("t", Tab$Table.ID_TAB)))
-                .join(TabGroup.class, Join.JoinType.LEFT).as("tg")
-                .on(Condition.column(ColumnAlias.columnWithTable("t", Tab$Table.ID_TAB_GROUP))
-                        .eq(ColumnAlias.columnWithTable("tg", TabGroup$Table.ID_TAB_GROUP)))
-                .where(Condition.column(ColumnAlias.columnWithTable("tg", TabGroup$Table.ID_TAB_GROUP))
-                        .eq(tabGroup.getId_tab_group()))
+                .where(Condition.column(ColumnAlias.columnWithTable("t", Tab$Table.ID_PROGRAM))
+                        .eq(program.getId_program()))
                 .orderBy(Tab$Table.ORDER_POS)
                 .orderBy(Question$Table.ORDER_POS).queryList();
 
