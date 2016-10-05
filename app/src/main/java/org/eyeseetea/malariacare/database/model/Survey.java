@@ -115,6 +115,9 @@ public class Survey extends BaseModel implements VisitableToSDK {
      */
     Integer productivity;
 
+    //hasMainScore is used to know if the survey have a compositeScore with only 1 query time.
+    private Boolean hasMainScore=null;
+
     public Survey() {
         //Set dates
         this.creationDate = new Date();
@@ -305,10 +308,9 @@ public class Survey extends BaseModel implements VisitableToSDK {
         }
         return mainScore;
     }
-    //hasMainScore is used to know if the survey have a compositeScore with only 1 query time.
-    private Boolean hasMainScore=null;
+
     public Boolean hasMainScore() {
-        if(hasMainScore==null) {
+        if(hasMainScore==null || !hasMainScore) {
             Score score = getScore();
             Float value = (score == null) ? null : score.getScore();
             if (value == null) {
@@ -320,6 +322,7 @@ public class Survey extends BaseModel implements VisitableToSDK {
         }
         return hasMainScore;
     }
+
     public void setMainScore(Float mainScore) {
         this.mainScore = mainScore;
     }
@@ -484,9 +487,10 @@ public class Survey extends BaseModel implements VisitableToSDK {
         int numRequired = Question.countRequiredByProgram(this.getTabGroup());
         int numCompulsory=Question.countCompulsoryByProgram(this.getTabGroup());
         int numOptional = (int)countNumOptionalQuestionsToAnswer();
+        int numActiveChildrenCompulsory = Question.countChildrenCompulsoryBySurvey(this.id_survey);
         int numAnswered = Value.countBySurvey(this);
         int numCompulsoryAnswered = Value.countCompulsoryBySurvey(this);
-        SurveyAnsweredRatio surveyAnsweredRatio=new SurveyAnsweredRatio(numRequired+numOptional, numAnswered,numCompulsory,numCompulsoryAnswered);
+        SurveyAnsweredRatio surveyAnsweredRatio=new SurveyAnsweredRatio(numRequired+numOptional, numAnswered,numCompulsory+numActiveChildrenCompulsory,numCompulsoryAnswered);
         SurveyAnsweredRatioCache.put(this.id_survey, surveyAnsweredRatio);
         return surveyAnsweredRatio;
     }

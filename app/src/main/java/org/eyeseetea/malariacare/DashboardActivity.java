@@ -48,6 +48,7 @@ import android.widget.TextView;
 
 import com.squareup.otto.Subscribe;
 
+import org.eyeseetea.malariacare.database.model.OrgUnit;
 import org.eyeseetea.malariacare.database.model.Program;
 import org.eyeseetea.malariacare.database.model.Survey;
 import org.eyeseetea.malariacare.database.model.User;
@@ -60,7 +61,6 @@ import org.eyeseetea.malariacare.fragments.DashboardUnsentFragment;
 import org.eyeseetea.malariacare.fragments.FeedbackFragment;
 import org.eyeseetea.malariacare.fragments.MonitorFragment;
 import org.eyeseetea.malariacare.fragments.SurveyFragment;
-import org.eyeseetea.malariacare.layout.score.ScoreRegister;
 import org.eyeseetea.malariacare.fragments.PlannedFragment;
 import org.eyeseetea.malariacare.receivers.AlarmPushReceiver;
 import org.eyeseetea.malariacare.services.SurveyService;
@@ -638,6 +638,9 @@ public class DashboardActivity extends BaseActivity implements DashboardUnsentFr
                 }).create().show();
     }
 
+    /**
+     * This method closes the survey fragment and loads the Assess fragment(DashboardUnSentFragment) in the Assess tab
+     */
     public void closeSurveyFragment(){
         surveyFragment.unregisterReceiver();
         initAssess();
@@ -645,6 +648,9 @@ public class DashboardActivity extends BaseActivity implements DashboardUnsentFr
         setActionBarDashboard();
     }
 
+    /**
+     * This method closes the Feedback Fragment and loads the Improve fragment(DashboardSentFragment) in the Improve tab
+     */
     private void closeFeedbackFragment() {
         isMoveToFeedback=false;
         feedbackFragment.unregisterReceiver();
