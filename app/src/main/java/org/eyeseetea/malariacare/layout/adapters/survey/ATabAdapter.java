@@ -25,8 +25,8 @@ import android.widget.BaseAdapter;
 
 import com.raizlabs.android.dbflow.structure.BaseModel;
 
-import org.eyeseetea.malariacare.database.model.Tab;
-import org.eyeseetea.malariacare.database.utils.Session;
+import org.eyeseetea.malariacare.data.database.model.Tab;
+import org.eyeseetea.malariacare.data.database.utils.Session;
 import org.eyeseetea.malariacare.utils.AUtils;
 
 import java.util.List;
@@ -39,7 +39,7 @@ public abstract class ATabAdapter extends BaseAdapter implements  ITabAdapter{
     private final Context context;
 
     //List of Headers and Questions. Each position contains an object to be showed in the listview
-    private List<? extends BaseModel> items;
+    private List items;
 
     public float idSurvey;
 
@@ -55,6 +55,7 @@ public abstract class ATabAdapter extends BaseAdapter implements  ITabAdapter{
         this.idSurvey=idSurvey;
         this.module=module;
     }
+
 
     @Override
     public BaseAdapter getAdapter() {
@@ -106,11 +107,13 @@ public abstract class ATabAdapter extends BaseAdapter implements  ITabAdapter{
     /**
      * Flag that indicates if the current survey in current module session is already sent or not (it affects readonly settings)
      */
-    public boolean getReadOnly(String module){ return Session.getSurveyByModule(module).isSent();}
+    public boolean getReadOnly(String module){
+        return Session.getSurveyByModule(module).isReadOnly();
+    }
 
     public Tab getTab() {
         return this.tab;
     }
 
-    public List<? extends BaseModel> getItems(){ return this.items; }
+    public List getItems(){ return this.items; }
 }
