@@ -24,18 +24,17 @@ import android.app.AlertDialog;
 import android.content.Context;
 import android.content.DialogInterface;
 import android.content.Intent;
+import android.os.AsyncTask;
 import android.os.Bundle;
 import android.os.Handler;
 import android.os.Looper;
 import android.telephony.TelephonyManager;
 import android.util.Log;
-import android.view.Menu;
 import android.view.MenuItem;
 import android.view.View;
 import android.widget.Toast;
 
 import org.eyeseetea.malariacare.data.database.iomodules.dhis.exporter.PushController;
-import org.eyeseetea.malariacare.data.database.iomodules.dhis.importer.models.EventExtended;
 import org.eyeseetea.malariacare.data.database.model.OrgUnit;
 import org.eyeseetea.malariacare.data.database.model.Program;
 import org.eyeseetea.malariacare.data.database.model.Survey;
@@ -53,10 +52,9 @@ import org.eyeseetea.malariacare.layout.dashboard.controllers.PlanModuleControll
 import org.eyeseetea.malariacare.network.PullClient;
 import org.eyeseetea.malariacare.receivers.AlarmPushReceiver;
 import org.eyeseetea.malariacare.services.SurveyService;
+import org.eyeseetea.malariacare.utils.AUtils;
 import org.eyeseetea.malariacare.utils.Constants;
-import org.hisp.dhis.client.sdk.android.api.persistence.flow.EventFlow;
 
-import java.util.Date;
 import java.util.List;
 
 
@@ -72,8 +70,13 @@ public class DashboardActivity extends BaseActivity {
     protected void onCreate(Bundle savedInstanceState) {
         Log.d(TAG, "onCreate");
         super.onCreate(savedInstanceState);
+
+
         handler = new Handler(Looper.getMainLooper());
         dashboardActivity = this;
+        if (getIntent().getBooleanExtra(getString(R.string.show_announcement_key), true) && !Session.getCredentials().isDemoCredentials()) {
+            new AsyncAnnouncement().execute();
+        }
 
         //XXX to remove?
         initDataIfRequired();
@@ -92,8 +95,10 @@ public class DashboardActivity extends BaseActivity {
         //inits autopush alarm
         AlarmPushReceiver.getInstance().setPushAlarm(this);
 
-        //Media: init drive credentials
-        DriveRestController.getInstance().init(this);
+        if (!Session.getCredentials().isDemoCredentials()) {
+            //Media: init drive credentials
+            DriveRestController.getInstance().init(this);
+        }
     }
 
 
@@ -198,12 +203,13 @@ public class DashboardActivity extends BaseActivity {
     }
 
     private void pushUnsentBeforePull() {
-        if(Session.getCredentials().isDemoCredentials()){
+        if (Session.getCredentials().isDemoCredentials()) {
             pullMetadata();//Push is not necessary in demo mode.
             return;
         }
         if (PreferencesState.getInstance().isPushInProgress()) {
-            Toast.makeText(getBaseContext(), R.string.toast_push_in_progress, Toast.LENGTH_LONG).show();
+            Toast.makeText(getBaseContext(), R.string.toast_push_in_progress,
+                    Toast.LENGTH_LONG).show();
             return;
         }
         PushController pushController = new PushController(getApplicationContext());
@@ -212,7 +218,8 @@ public class DashboardActivity extends BaseActivity {
         pushUseCase.execute(new PushUseCase.Callback() {
             @Override
             public void onComplete() {
-                Toast.makeText(getBaseContext(), R.string.toast_push_done, Toast.LENGTH_LONG).show();
+                Toast.makeText(getBaseContext(), R.string.toast_push_done,
+                        Toast.LENGTH_LONG).show();
 
                 pullMetadata();
             }
@@ -233,7 +240,8 @@ public class DashboardActivity extends BaseActivity {
 
             @Override
             public void onSurveysNotFoundError() {
-                Toast.makeText(getBaseContext(), R.string.push_surveys_not_found, Toast.LENGTH_LONG).show();
+                Toast.makeText(getBaseContext(), R.string.push_surveys_not_found,
+                        Toast.LENGTH_LONG).show();
                 Log.e(TAG, getString(R.string.push_surveys_not_found));
             }
 
@@ -247,7 +255,8 @@ public class DashboardActivity extends BaseActivity {
 
             @Override
             public void onNetworkError() {
-                Toast.makeText(getBaseContext(), R.string.network_no_available, Toast.LENGTH_LONG).show();
+                Toast.makeText(getBaseContext(), R.string.network_no_available,
+                        Toast.LENGTH_LONG).show();
                 Log.e(TAG, getString(R.string.network_no_available));
             }
         });
@@ -465,5 +474,39 @@ public class DashboardActivity extends BaseActivity {
                 (PlanModuleController) dashboardController.getModuleByName(
                         PlanModuleController.getSimpleName());
         planModuleController.clickOrgProgramSpinner();
+    }
+
+
+    public class AsyncAnnouncement extends AsyncTask<Void, Void, Void> {
+        User loggedUser;
+
+        @Override
+        protected Void doInBackground(Void... params) {
+            PullClient pullClient = new PullClient(PreferencesState.getInstance().getContext());
+            loggedUser = User.getLoggedUser();
+            /* Ignoring the update date
+            boolean isUpdated = pullClient.isUserUpdated(loggedUser);
+            if (isUpdated) {
+                pullClient.pullUserAttributes(loggedUser);
+            }*/
+            loggedUser = pullClient.pullUserAttributes(loggedUser);
+            loggedUser.save();//save the lastUpdated info and attributes
+            return null;
+        }
+
+        @Override
+        protected void onPostExecute(Void aVoid) {
+            super.onPostExecute(aVoid);
+
+            if (loggedUser.getAnnouncement() != null && !loggedUser.getAnnouncement().equals("")
+                    && !PreferencesState.getInstance().isUserAccept()) {
+                Log.d(TAG, "show logged announcement");
+                AUtils.showAnnouncement(R.string.admin_announcement, loggedUser.getAnnouncement(),
+                        DashboardActivity.this);
+                //show model dialog
+            } else {
+                AUtils.checkUserClosed(loggedUser, DashboardActivity.this);
+            }
+        }
     }
 }
