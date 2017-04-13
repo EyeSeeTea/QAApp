@@ -25,6 +25,8 @@ import android.content.DialogInterface;
 import android.os.Build;
 import android.text.Html;
 import android.text.Spanned;
+import android.text.method.LinkMovementMethod;
+import android.text.util.Linkify;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
@@ -37,7 +39,6 @@ import com.raizlabs.android.dbflow.structure.BaseModel;
 import org.eyeseetea.malariacare.R;
 import org.eyeseetea.malariacare.data.database.model.Option;
 import org.eyeseetea.malariacare.data.database.model.Question;
-import org.eyeseetea.malariacare.data.database.model.Value;
 import org.eyeseetea.malariacare.data.database.utils.PreferencesState;
 import org.eyeseetea.malariacare.data.database.utils.ReadWriteDB;
 import org.eyeseetea.malariacare.layout.adapters.general.OptionArrayAdapter;
@@ -106,14 +107,14 @@ public class AutoTabLayoutUtils {
         }
 
         public void setNumAndDenum(String numText, String denumText) {
-            if(PreferencesState.getInstance().isShowNumDen()) {
+            if(PreferencesState.getInstance().isDevelopOptionActive()) {
                 num.setText(numText);
                 denum.setText(denumText);
             }
         }
 
         public void setNum(String numText) {
-            if(PreferencesState.getInstance().isShowNumDen()) {
+            if(PreferencesState.getInstance().isDevelopOptionActive()) {
                 num.setText(numText);
             }
         }
@@ -213,7 +214,7 @@ public class AutoTabLayoutUtils {
 
     public static View initialiseDropDown(int position, ViewGroup parent, Question question, AutoTabViewHolder viewHolder, LayoutInflater lInflater, Context context) {
         View rowView;
-        if(PreferencesState.getInstance().isShowNumDen()) {
+        if(PreferencesState.getInstance().isDevelopOptionActive()) {
             rowView = initialiseView(R.layout.ddl_scored, parent, question, viewHolder, position, lInflater);
             initialiseScorableComponent(rowView, viewHolder);
         }else{
@@ -237,15 +238,23 @@ public class AutoTabLayoutUtils {
 
         viewHolder.component = rowView.findViewById(R.id.answer);
         viewHolder.statement = (CustomTextView) rowView.findViewById(R.id.statement);
-
+        String uidLinkHtml = "<span>"+question.getForm_name()+"</span>";
+        if(PreferencesState.getInstance().isDevelopOptionActive()) {
+            uidLinkHtml = "<a href=\"" + PreferencesState.getInstance().getServerUrl()
+                    + PreferencesState.getInstance().getContext().getString(
+                    R.string.api_data_elements) + question.getUid() + "\">(" + question.getUid()
+                    + ")</a>";
+        }
         if(question.getCompulsory()){
             int red = PreferencesState.getInstance().getContext().getResources().getColor(R.color.darkRed);
             String appNameColorString = String.format("%X", red).substring(2);
-            Spanned spannedQuestion= Html.fromHtml(String.format("<font color=\"#%s\"><b>", appNameColorString) + "*  " + "</b></font>" + question.getForm_name());
+            Spanned spannedQuestion= Html.fromHtml(String.format("<font color=\"#%s\"><b>", appNameColorString) + "*  " + "</b></font>" + question.getForm_name() + uidLinkHtml);
             viewHolder.statement.setText(spannedQuestion);
         }else{
-            viewHolder.statement.setText(question.getForm_name());
+            viewHolder.statement.setText(Html.fromHtml("<span>"+question.getForm_name()+"</span>"+uidLinkHtml));
         }
+        viewHolder.statement.setMovementMethod(LinkMovementMethod.getInstance());
+
 
         return rowView;
     }
@@ -277,7 +286,7 @@ public class AutoTabLayoutUtils {
     private static void configureViewByPreference(AutoTabViewHolder viewHolder) {
         int visibility = View.GONE;
 
-        if (PreferencesState.getInstance().isShowNumDen()) {
+        if (PreferencesState.getInstance().isDevelopOptionActive()) {
             visibility = View.VISIBLE;
         }
 
