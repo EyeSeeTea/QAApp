@@ -37,18 +37,17 @@ import android.view.MenuItem;
 import android.view.View;
 import android.view.Window;
 
-import org.eyeseetea.malariacare.data.database.datasources.ConversionLocalDataSource;
 import org.eyeseetea.malariacare.data.database.model.Survey;
 import org.eyeseetea.malariacare.data.database.utils.ExportData;
 import org.eyeseetea.malariacare.data.database.utils.LocationMemory;
 import org.eyeseetea.malariacare.data.database.utils.PreferencesState;
-import org.eyeseetea.malariacare.data.database.utils.Session;
 import org.eyeseetea.malariacare.data.repositories.UserAccountRepository;
 import org.eyeseetea.malariacare.domain.boundary.IUserAccountRepository;
 import org.eyeseetea.malariacare.domain.usecase.LogoutUseCase;
 import org.eyeseetea.malariacare.layout.dashboard.builder.AppSettingsBuilder;
 import org.eyeseetea.malariacare.layout.listeners.SurveyLocationListener;
 import org.eyeseetea.malariacare.layout.utils.LayoutUtils;
+import org.eyeseetea.malariacare.receivers.AlarmPushReceiver;
 import org.eyeseetea.malariacare.utils.AUtils;
 import org.eyeseetea.malariacare.utils.Constants;
 
@@ -65,6 +64,7 @@ public abstract class BaseActivity extends ActionBarActivity {
 
     LogoutUseCase mLogoutUseCase;
     IUserAccountRepository mUserAccountRepository;
+    private AlarmPushReceiver alarmPush;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -78,18 +78,18 @@ public abstract class BaseActivity extends ActionBarActivity {
         mUserAccountRepository = new UserAccountRepository(this);
         mLogoutUseCase = new LogoutUseCase(mUserAccountRepository);
         checkQuarantineSurveys();
+        alarmPush = new AlarmPushReceiver();
+        alarmPush.setPushAlarm(this);
     }
 
     private void checkQuarantineSurveys() {
-        if (PreferencesState.getInstance().isPushInProgress()) {
-            List<Survey> surveys = Survey.getAllSendingSurveys();
-            Log.d(TAG + "B&D", "The app was closed in the middle of a push. Surveys sending: "
-                    + surveys.size());
-            for (Survey survey : surveys) {
-                survey.setStatus(Constants.SURVEY_QUARANTINE);
-                survey.save();
-            }
-            PreferencesState.getInstance().setPushInProgress(false);
+        PreferencesState.getInstance().setPushInProgress(false);
+        List<Survey> surveys = Survey.getAllSendingSurveys();
+        Log.d(TAG + "B&D", "Pending surveys sending: "
+                + surveys.size());
+        for (Survey survey : surveys) {
+            survey.setStatus(Constants.SURVEY_QUARANTINE);
+            survey.save();
         }
     }
 
@@ -189,14 +189,6 @@ public abstract class BaseActivity extends ActionBarActivity {
             item.setVisible(false);
         }
         return true;
-    }
-
-    @Override
-    protected void onActivityResult(int requestCode, int resultCode, Intent data) {
-        // TODO Auto-generated method stub
-        if ((requestCode == DUMP_REQUEST_CODE)) {
-            ExportData.removeDumpIfExist(this);
-        }
     }
 
     /**
@@ -336,5 +328,11 @@ public abstract class BaseActivity extends ActionBarActivity {
      */
     private void debugMessage(String message) {
         Log.d("." + this.getClass().getSimpleName(), message);
+    }
+
+    @Override
+    protected void onDestroy() {
+        super.onDestroy();
+        alarmPush.cancelPushAlarm(this);
     }
 }

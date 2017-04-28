@@ -47,10 +47,9 @@ import com.raizlabs.android.dbflow.structure.BaseModel;
 import org.eyeseetea.malariacare.data.database.AppDatabase;
 import org.eyeseetea.malariacare.data.database.iomodules.dhis.exporter.IConvertToSDKVisitor;
 import org.eyeseetea.malariacare.data.database.iomodules.dhis.exporter.VisitableToSDK;
-import org.eyeseetea.malariacare.domain.entity.SurveyAnsweredRatio;
-import org.eyeseetea.malariacare.domain.entity.SurveyAnsweredRatioCache;
 import org.eyeseetea.malariacare.data.database.utils.planning.SurveyPlanner;
-import org.eyeseetea.malariacare.domain.usecase.GetSurveyAnsweredRatioUseCase;
+import org.eyeseetea.malariacare.domain.entity.SurveyAnsweredRatio;
+import org.eyeseetea.malariacare.domain.exception.ConversionException;
 import org.eyeseetea.malariacare.layout.score.ScoreRegister;
 import org.eyeseetea.malariacare.utils.Constants;
 import org.hisp.dhis.client.sdk.android.api.persistence.flow.EventFlow;
@@ -549,16 +548,27 @@ public class Survey extends BaseModel implements VisitableToSDK {
                 .orderBy(OrderBy.fromProperty(Survey_Table.completion_date))
                 .orderBy(OrderBy.fromProperty(Survey_Table.id_org_unit_fk)).querySingle();
     }
-
+    /**
+     * Returns the number of surveys with status yet not put to "Sent/conflict/planned.."
+     */
+    public static int countAllUnsentUnplannedSurveys() {
+        return (int) SQLite.selectCountOf().from(Survey.class)
+                .where(Survey_Table.status.is(Constants.SURVEY_COMPLETED))
+                .or(Survey_Table.status.is(Constants.SURVEY_IN_PROGRESS))
+                .or(Survey_Table.status.is(Constants.SURVEY_SENDING))
+                .or(Survey_Table.status.is(Constants.SURVEY_QUARANTINE))
+                .orderBy(OrderBy.fromProperty(Survey_Table.completion_date))
+                .orderBy(OrderBy.fromProperty(Survey_Table.id_org_unit_fk)).count();
+    }
     /**
      * Returns all the surveys with status yet not put to "Sent"
      */
     public static List<Survey> getAllUnsentUnplannedSurveys() {
         return new Select().from(Survey.class)
-                .where(Survey_Table.status.isNot(Constants.SURVEY_SENT))
-                .and(Survey_Table.status.isNot(Constants.SURVEY_PLANNED))
-                .and(Survey_Table.status.isNot(Constants.SURVEY_SENDING))
-                .and(Survey_Table.status.isNot(Constants.SURVEY_QUARANTINE))
+                .where(Survey_Table.status.is(Constants.SURVEY_COMPLETED))
+                .or(Survey_Table.status.is(Constants.SURVEY_IN_PROGRESS))
+                .or(Survey_Table.status.is(Constants.SURVEY_SENDING))
+                .or(Survey_Table.status.is(Constants.SURVEY_QUARANTINE))
                 .orderBy(OrderBy.fromProperty(Survey_Table.completion_date))
                 .orderBy(OrderBy.fromProperty(Survey_Table.id_org_unit_fk)).queryList();
     }
@@ -613,7 +623,7 @@ public class Survey extends BaseModel implements VisitableToSDK {
     }
 
     @Override
-    public void accept(IConvertToSDKVisitor IConvertToSDKVisitor) throws Exception {
+    public void accept(IConvertToSDKVisitor IConvertToSDKVisitor) throws ConversionException {
         IConvertToSDKVisitor.visit(this);
     }
 
@@ -637,6 +647,18 @@ public class Survey extends BaseModel implements VisitableToSDK {
                 .orderBy(OrderBy.fromProperty(Survey_Table.id_org_unit_fk)).queryList();
     }
 
+    /**
+     * Returns the last survey by each program and orgunit combination ordered by completiondate
+     */
+    public static List<Survey> getLastSentCompletedOrConflictSurveys() {
+        return new Select().from(Survey.class)
+                .where(Survey_Table.status.eq(Constants.SURVEY_SENT))
+                .or(Survey_Table.status.eq(Constants.SURVEY_COMPLETED))
+                .or(Survey_Table.status.eq(Constants.SURVEY_CONFLICT))
+                .orderBy(OrderBy.fromProperty(Survey_Table.completion_date))
+                .groupBy(Survey_Table.id_org_unit_fk, Survey_Table.id_program_fk)
+                .queryList();
+    }
     /**
      * Returns all the surveys with status put to "Sent" or completed or Conflict
      */
