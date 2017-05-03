@@ -21,12 +21,14 @@ package org.eyeseetea.malariacare.layout.score;
 
 import android.util.Log;
 
-import org.eyeseetea.malariacare.database.model.CompositeScore;
-import org.eyeseetea.malariacare.database.model.Option;
-import org.eyeseetea.malariacare.database.model.Question;
-import org.eyeseetea.malariacare.database.model.Survey;
-import org.eyeseetea.malariacare.database.model.Tab;
-import org.eyeseetea.malariacare.database.model.Value;
+import org.eyeseetea.malariacare.data.database.model.CompositeScore;
+import org.eyeseetea.malariacare.data.database.model.Option;
+import org.eyeseetea.malariacare.data.database.model.Question;
+import org.eyeseetea.malariacare.data.database.model.Survey;
+import org.eyeseetea.malariacare.data.database.model.Tab;
+import org.eyeseetea.malariacare.data.database.model.Value;
+import org.eyeseetea.malariacare.layout.utils.QuestionRow;
+
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashMap;
@@ -69,6 +71,13 @@ public class ScoreRegister {
         tabScoreMap.get(module).get(idSurvey).get(question.getHeader().getTab()).addRecord(question, num, den);
     }
 
+    public static void addQuestionRowRecords(QuestionRow questionRow, float idSurvey, String module){
+        for(Question question:questionRow.getQuestions()){
+            ScoreRegister.addRecord(question, 0F, ScoreRegister.calcDenum(question, idSurvey), idSurvey, module);
+        }
+
+    }
+
     public static void deleteRecord(Question question, float idSurvey, String module){
         if (question.getCompositeScore() != null)
             compositeScoreMapBySurvey.get(module).get(idSurvey).get(question.getCompositeScore()).deleteRecord(question);
@@ -76,7 +85,7 @@ public class ScoreRegister {
     }
 
     private static List<Float> getRecursiveScore(CompositeScore cScore, List<Float> result, float idSurvey, String module) {
-
+        Log.d(TAG, " mod "+ module +" idsurvey "+ idSurvey + " score "+ cScore);
         //Protect from wrong server data
         if (compositeScoreMapBySurvey.get(module).get(idSurvey).get(cScore)==null) {
             return Arrays.asList(0f,0f);
@@ -196,7 +205,7 @@ public class ScoreRegister {
 
     /**
      * Calculates the numerator of the given question & survey
-     * returns null if the question will be ignored by the scoreregister and the question denominator will be ignored too.
+     * returns null is invalid question to the scoreregister and the question denominator will be ignored too.
      * @param question
      * @param idSurvey
      * @return
@@ -260,18 +269,21 @@ public class ScoreRegister {
      */
     public static List<CompositeScore> loadCompositeScores(Survey survey, String module){
         //Cleans score
+        Log.d(TAG, "clean composite score "+ survey.getId_survey() + " module " + module);
         ScoreRegister.clear(survey.getId_survey(), module);
+        Log.d(TAG, "load composite Score "+ survey.getId_survey() + " module " + module);
 
         //Register scores for tabs
-        List<Tab> tabs=survey.getTabGroup().getTabs();
+        List<Tab> tabs=survey.getProgram().getTabs();
         ScoreRegister.registerTabScores(tabs, survey.getId_survey(), module);
 
         //Register scores for composites
-        List<CompositeScore> compositeScoreList=CompositeScore.listByTabGroup(survey.getTabGroup());
+        List<CompositeScore> compositeScoreList=CompositeScore.listByProgram(survey.getProgram());
         ScoreRegister.registerCompositeScores(compositeScoreList, survey.getId_survey(), module);
         //Initialize scores x question
-        ScoreRegister.initScoresForQuestions(Question.listByTabGroup(survey.getTabGroup()), survey, module);
-        
+        ScoreRegister.initScoresForQuestions(Question.listByProgram(survey.getProgram()), survey, module);
+
+        Log.d(TAG, "Composite Score loaded "+ survey.getId_survey() + " module " + module);
         return compositeScoreList;
     }
 
@@ -289,7 +301,7 @@ public class ScoreRegister {
                 }
             }
         }
-        return sumScores/numParentScores;
+        return (numParentScores==0) ? 0 : sumScores/numParentScores;
     }
 
 

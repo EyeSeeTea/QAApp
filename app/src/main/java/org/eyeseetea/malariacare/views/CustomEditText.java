@@ -28,7 +28,7 @@ import android.util.TypedValue;
 import android.widget.EditText;
 
 import org.eyeseetea.malariacare.R;
-import org.eyeseetea.malariacare.database.utils.PreferencesState;
+import org.eyeseetea.malariacare.data.database.utils.PreferencesState;
 
 /**
  * TODO: document your custom view class.
@@ -61,7 +61,7 @@ public class CustomEditText extends EditText implements IEyeSeeView{
 
     public void init(AttributeSet attrs, int defStyle) {
 
-        if(isInEditMode()){
+        if(!PreferencesState.getInstance().isVerticalDashboard() && isInEditMode()){
             return;
         }
 
