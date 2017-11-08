@@ -1,59 +1,63 @@
 package org.eyeseetea.malariacare.domain.usecase;
 
-import org.eyeseetea.malariacare.data.database.model.Program;
-import org.eyeseetea.malariacare.data.database.model.Question;
-import org.eyeseetea.malariacare.data.database.model.Value;
+import org.eyeseetea.malariacare.data.database.model.SurveyDB;
+import org.eyeseetea.malariacare.domain.boundary.executors.IAsyncExecutor;
+import org.eyeseetea.malariacare.domain.boundary.executors.IMainExecutor;
+import org.eyeseetea.malariacare.domain.boundary.repositories.ISurveyAnsweredRatioRepository;
 import org.eyeseetea.malariacare.domain.entity.SurveyAnsweredRatio;
-import org.eyeseetea.malariacare.domain.entity.SurveyAnsweredRatioCache;
 
-public class GetSurveyAnsweredRatioUseCase {
-    public interface Callback{
-        void nextProgressMessage();
-        void onComplete(SurveyAnsweredRatio surveyAnsweredRatio);
+public class GetSurveyAnsweredRatioUseCase implements UseCase{
+
+    private ISurveyAnsweredRatioRepository mSurveyAnsweredRatioRepository;
+
+    private SurveyAnsweredRatio answeredQuestionRatio;
+
+    private IMainExecutor mMainExecutor;
+    private IAsyncExecutor mAsyncExecutor;
+    private ISurveyAnsweredRatioCallback mCallback;
+    private long idSurvey;
+
+    public GetSurveyAnsweredRatioUseCase(
+            ISurveyAnsweredRatioRepository surveyAnsweredRatioRepository,
+            IMainExecutor mainExecutor,
+            IAsyncExecutor asyncExecutor) {
+        mMainExecutor = mainExecutor;
+        mAsyncExecutor = asyncExecutor;
+        mSurveyAnsweredRatioRepository = surveyAnsweredRatioRepository;
     }
 
-    public enum RecoveryFrom {DATABASE, MEMORY_FIRST }
+    public SurveyAnsweredRatio mSurveyAnsweredRatio;
 
-    /**
-     * Calculated answered ratio for this survey according to its values
-     */
-    SurveyAnsweredRatio answeredQuestionRatio;
+    SurveyDB surveyDB;
 
-    public GetSurveyAnsweredRatioUseCase() {
+    public void execute(long idSurvey, ISurveyAnsweredRatioCallback callback) {
+        this.idSurvey=idSurvey;
+        mCallback = callback;
+        mAsyncExecutor.run(this);
     }
 
-    SurveyAnsweredRatio mSurveyAnsweredRatio;
-    RecoveryFrom mRecoveryFrom;
-
-    org.eyeseetea.malariacare.data.database.model.Survey surveyDB;
-
-    public void execute(long idSurvey, RecoveryFrom recoveryFrom, GetSurveyAnsweredRatioUseCase.Callback callback) {
-        this.mRecoveryFrom = recoveryFrom;
-        SurveyAnsweredRatio surveyAnsweredRatio = getSurveyWithStatusAndAnsweredRatio(idSurvey, callback);
-        callback.onComplete(surveyAnsweredRatio);
+    @Override
+    public void run() {
+        SurveyAnsweredRatio surveyAnsweredRatio = getSurveyWithStatusAndAnsweredRatio(idSurvey, mCallback);
+        onGetSurveyComplete(surveyAnsweredRatio);
     }
 
-    private SurveyAnsweredRatio getSurveyWithStatusAndAnsweredRatio(long idSurvey, GetSurveyAnsweredRatioUseCase.Callback callback) {
-        surveyDB = org.eyeseetea.malariacare.data.database.model.Survey.findById(idSurvey);
-        if(mRecoveryFrom.equals(RecoveryFrom.DATABASE)) {
-            mSurveyAnsweredRatio = reloadSurveyAnsweredRatio(callback);
-        }else if(mRecoveryFrom.equals(RecoveryFrom.MEMORY_FIRST)){
-            mSurveyAnsweredRatio = getAnsweredQuestionRatio(callback);
-        }
+    private SurveyAnsweredRatio getSurveyWithStatusAndAnsweredRatio(long idSurvey,
+            ISurveyAnsweredRatioCallback callback) {
+        surveyDB = SurveyDB.findById(idSurvey);
+        mSurveyAnsweredRatio = getAnsweredQuestionRatio(idSurvey, callback);
         return mSurveyAnsweredRatio;
     }
-
 
     /**
      * Ratio of completion is cached into answeredQuestionRatio in order to speed up loading
      */
-    public SurveyAnsweredRatio getAnsweredQuestionRatio(GetSurveyAnsweredRatioUseCase.Callback callback) {
+    public SurveyAnsweredRatio getAnsweredQuestionRatio(Long idSurvey, ISurveyAnsweredRatioCallback callback) {
+        answeredQuestionRatio = mSurveyAnsweredRatioRepository.getSurveyAnsweredRatioBySurveyId(idSurvey);
         if (answeredQuestionRatio == null) {
-            answeredQuestionRatio = SurveyAnsweredRatioCache.get(surveyDB.getId_survey());
-            if (answeredQuestionRatio == null) {
-                answeredQuestionRatio = reloadSurveyAnsweredRatio(callback);
-            }
+            answeredQuestionRatio = reloadSurveyAnsweredRatio(callback);
         }
+
         return answeredQuestionRatio;
     }
 
@@ -62,25 +66,28 @@ public class GetSurveyAnsweredRatioUseCase {
      *
      * @return SurveyAnsweredRatio that hold the total & answered questions.
      */
-    public SurveyAnsweredRatio reloadSurveyAnsweredRatio(GetSurveyAnsweredRatioUseCase.Callback callback) {
-        //TODO Review
-        SurveyAnsweredRatio surveyAnsweredRatio=null;
-        Program surveyProgram = surveyDB.getProgram();
-        int numRequired = Question.countRequiredByProgram(surveyProgram);
-        int numCompulsory = Question.countCompulsoryByProgram(surveyProgram);
-        int numOptional = (int) surveyDB.countNumOptionalQuestionsToAnswer();
-        if(callback!=null) {
-            callback.nextProgressMessage();
-        }
-        int numActiveChildrenCompulsory = Question.countChildrenCompulsoryBySurvey(
-                surveyDB.getId_survey(), callback);
-        int numAnswered = Value.countBySurvey(surveyDB);
-        int numCompulsoryAnswered = Value.countCompulsoryBySurvey(surveyDB);
-        surveyAnsweredRatio = new SurveyAnsweredRatio(
-                numRequired + numOptional,
-                numAnswered, numCompulsory + numActiveChildrenCompulsory,
-                numCompulsoryAnswered);
-        SurveyAnsweredRatioCache.put(surveyDB.getId_survey(), surveyAnsweredRatio);
-        return surveyAnsweredRatio;
+    private SurveyAnsweredRatio reloadSurveyAnsweredRatio(ISurveyAnsweredRatioCallback callback) {
+        return mSurveyAnsweredRatioRepository.loadSurveyAnsweredRatio(callback, surveyDB);
     }
+
+
+    private void onGetSurveyComplete(final SurveyAnsweredRatio surveyAnsweredRatio) {
+        mMainExecutor.run(new Runnable() {
+            @Override
+            public void run() {
+                mCallback.onComplete(surveyAnsweredRatio);
+            }
+        });
+    }
+
+
+    private void notifyProgressMessage() {
+        mMainExecutor.run(new Runnable() {
+            @Override
+            public void run() {
+                mCallback.nextProgressMessage();
+            }
+        });
+    }
+
 }

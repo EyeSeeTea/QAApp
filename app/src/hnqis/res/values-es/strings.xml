@@ -38,8 +38,8 @@
 <string name="create_info_survey">"Formulario"</string>
 <string name="create_info_tabs_group">"Grupo de Pestañas"</string>
 
-<string name="assessment_title_facility_date">"Centro de salud/ Fecha"</string>
-<string name="assessment_title_state">"Estado"</string>
+<string name="assessment_title_facility_date">"Instalación / Encuesta</string>
+<string name="assessment_title_state">"%Completo"</string>
 <string name="assessment_sent_date">"Fecha de llenado"</string>
 <string name="assessment_title_header">"Evaluación(es) Activa(s)"</string>
 <string name="assessment_sent_title_header">"Evaluación(es) Anterior(es)"</string>
@@ -117,9 +117,10 @@ clínica"</string>
 <string name="dashboard_title_planned_type_future">"Futuro"</string>
 <string name="dashboard_title_planned_productivity">"Prd"</string>
 <string name="dashboard_title_planned_quality_of_care">"QoC"</string>
-<string name="dashboard_title_planned_next_qa">"Próxima evaluación"</string>
+<string name="dashboard_title_planned_next_qa">"Próx. eval."</string>
 <string name="assessment_sent_score">"Puntos"</string>
 <string name="feedback_show_only_failed">"Mostrar solo preguntas falladas"</string>
+<string name="feedback_show_only_media">"Mostrar sólo las preguntas que contienen vídeo / imagen"</string>
 <string name="feedback_show_only_one_or_show_all">"Mostrar sólo la última respuesta por programa/unidad organizativa"</string>
 <string name="feedback_return">"Regresar a todas las evaluaciones"</string>
 <string name="quality_of_care">"Calidad de la Asistencia (QoC) Puntuación:"</string>
@@ -139,6 +140,7 @@ clínica"</string>
 <string name="server_url">"Servidor DHIS2"</string>
 <string name="settings_text_dhis_password">"Contraseña DHIS"</string>
 <string name="settings_text_dhis_max_items">"DHIS max encuestas descargadas"</string>
+<string name="settings_monitoring_target">"Objetivo de monitorización"</string>
 <string name="dialog_error_push_uids">"UIDs incorrectos encontrados en el envio"</string>
 <string name="dialog_error_push_no_location_and_required">"Localización no disponible y es un campo obligatorio"</string>
 <string name="dialog_error_attribute_null">"El atributo con id %s es null, por favor, póngase en contacto con el administrador del servidor."</string>
@@ -166,7 +168,7 @@ clínica"</string>
 <string name="progress_pull_done">"Hecho"</string>
 <string name="dialog_push_success">"Encuestra correctamente subida al servidor Dhis"</string>
 <string name="planning_title_dialog">"Planificar evaluación"</string>
-<string name="planning_label_comment">"* Comentario"</string>
+<string name="planning_label_comment">"Comentario"</string>
 <string name="planning_label_schedule_date">"* Fecha planificada"</string>
 <string name="option_edit">"Editar"</string>
 <string name="option_mark_completed">"Marcar como completa"</string>
@@ -178,7 +180,7 @@ clínica"</string>
 <string name="improve">"Mejora"</string>
 <string name="monitor">"Monitorización"</string>
 <string name="filter_all_org_units">"todas las unidades organizativas"</string>
-<string name="filter_all_org_assessments">"todas las evaluaciones"</string>
+<string name="filter_all_org_assessments">"Todos evaluados"</string>
 <string name="dialog_content_dhis_preference_login">"Cambiar el servidor implica volver a iniciar sesión. Se eliminarán todas las encuestas no enviadas. ¿Estás seguro de que quieres continuar?"</string>
 <string name="lastcommit">"Versión %s"</string>
 <string name="unavailable">"No disponible"</string>
@@ -197,6 +199,7 @@ clínica"</string>
 <string name="developer_option_summary">Esta opción activa las opciones de desarrollador</string>
 <string name="developer_option_title">Mostrar opciones de desarrollador</string>
 <string name="export_data_option_title">Exportar base de datos</string>
+<string name="import_data_option_title">Importar base de datos</string>
 <string name="google_play_required">Esta aplicación requiere los servicios de Play. Por favor, instale servicios de Google Play en el dispositivo reinicie esta aplicación.</string>
 <string name="account_permission_denied">Permiso de contactos denegado. Archivos multimedia no serán sincronizados</string>
 <string name="feedback_media">Ver video feedback</string>
@@ -222,9 +225,11 @@ clínica"</string>
 <string name="dialog_action_refresh">"Refrescar los metadatos requiere eliminar o enviar los datos no enviados."</string>
 <string name="dialog_incomplete_surveys_before_refresh">"Tiene %d encuestas no enviadas y serán eliminadas. ¿Quieres continuar?"</string>
 <string name="dialog_all_surveys_sent_before_refresh">"No tiene encuestas no solicitadas. ¿Quieres continuar?"</string>
+<string name="install_file_manager">Instale un Administrador de archivos.</string>
+<string name="get_db_file_dialog">Seleccione un archivo db válido.</string>
+<string name="start">Comenzar</string>
 
 <string name="header_reschedule">"Reprogramar"</string>
-<string name="planing_schedule">"Programar"</string>
 <string name="planing_due_date">"Fecha de vencimiento"</string>
 <string name="action_button_text">PLAN DE ACCIÓN</string>
 <string name="plan_action_title">Observaciones y plan de acción</string>
@@ -252,6 +257,15 @@ clínica"</string>
 <string name="url_not_available">URL aún no disponible</string>
 <string name="see_full_assessment">Ver evaluación completa en:</string>
 <string name="on">"en"</string>
+
+<string name="add">"Añadir"</string>
+<string name="change_date">"Cambiar fecha"</string>
+<string name="show_history">"Historial de programación"</string>
+<string name="comments">"Comentarios"</string>
+<string name="dates">"Fechas anteriores"</string>
+<string name="mark_complete">"Marcar completado"</string>
 <string name="plain_text">Texto sin formato </string>
 <string name="html_text">Texto con formato </string>
+<string name="schedule_title">Programación de encuesta</string>
+<string name="save">"salvar"</string>
 </resources>

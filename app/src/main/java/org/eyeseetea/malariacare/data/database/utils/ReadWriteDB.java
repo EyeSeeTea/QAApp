@@ -19,9 +19,12 @@
 
 package org.eyeseetea.malariacare.data.database.utils;
 
-import org.eyeseetea.malariacare.data.database.model.Option;
-import org.eyeseetea.malariacare.data.database.model.Question;
-import org.eyeseetea.malariacare.data.database.model.Value;
+import org.eyeseetea.malariacare.data.database.model.OptionDB;
+import org.eyeseetea.malariacare.data.database.model.QuestionDB;
+import org.eyeseetea.malariacare.data.database.model.ValueDB;
+import org.eyeseetea.malariacare.domain.entity.Question;
+import org.eyeseetea.malariacare.domain.subscriber.DomainEventPublisher;
+import org.eyeseetea.malariacare.domain.subscriber.event.ValueChangedEvent;
 import org.eyeseetea.malariacare.utils.Constants;
 
 import java.util.ArrayList;
@@ -33,10 +36,10 @@ import java.util.List;
  */
 public class ReadWriteDB {
 
-    public static String readValueQuestion(Question question, String module) {
+    public static String readValueQuestion(QuestionDB question, String module) {
         String result = null;
 
-        Value value = question.getValueBySession(module);
+        ValueDB value = question.getValueBySession(module);
 
         if (value != null)
             result = value.getValue();
@@ -44,24 +47,24 @@ public class ReadWriteDB {
         return result;
     }
 
-    public static int readPositionOption(Question question, String module) {
+    public static int readPositionOption(QuestionDB question, String module) {
         int result = 0;
 
-        Value value = question.getValueBySession(module);
+        ValueDB value = question.getValueBySession(module);
         if (value != null) {
 
-            List<Option> optionList = new ArrayList<>(question.getAnswer().getOptions());
-            optionList.add(0, new Option(Constants.DEFAULT_SELECT_OPTION));
+            List<OptionDB> optionList = new ArrayList<>(question.getAnswer().getOptions());
+            optionList.add(0, new OptionDB(Constants.DEFAULT_SELECT_OPTION));
             result = optionList.indexOf(value.getOption());
         }
 
         return result;
     }
 
-    public static Option readOptionAnswered(Question question, String module) {
-        Option option = null;
+    public static OptionDB readOptionAnswered(QuestionDB question, String module) {
+        OptionDB option = null;
 
-        Value value = question.getValueBySession(module);
+        ValueDB value = question.getValueBySession(module);
 
         if (value != null)
             option = value.getOption();
@@ -69,14 +72,17 @@ public class ReadWriteDB {
         return option;
     }
 
-    public static void saveValuesDDL(Question question, Option option, String module) {
+    public static void saveValuesDDL(QuestionDB question, OptionDB option, String module) {
 
-        Value value = question.getValueBySession(module);
+        ValueDB value = question.getValueBySession(module);
 
         if (!option.getName().equals(Constants.DEFAULT_SELECT_OPTION)) {
             if (value == null) {
-                value = new Value(option, question, Session.getSurveyByModule(module));
+                value = new ValueDB(option, question, Session.getSurveyByModule(module));
                 value.save();
+                DomainEventPublisher
+                        .instance()
+                        .publish(new ValueChangedEvent(Session.getSurveyByModule(module).getId_survey(), new Question(question.getId_question(), question.getCompulsory()),ValueChangedEvent.Action.INSERT));
             } else {
                 value.setOption(option);
                 value.setValue(option.getName());
@@ -84,18 +90,26 @@ public class ReadWriteDB {
                 value.update();
             }
         } else {
-            if (value != null) value.delete();
+            if (value != null) {
+                value.delete();
+                DomainEventPublisher
+                        .instance()
+                        .publish(new ValueChangedEvent(Session.getSurveyByModule(module).getId_survey(), new Question(question.getId_question(), question.getCompulsory()),ValueChangedEvent.Action.DELETE));
+            }
         }
     }
 
-    public static void saveValuesText(Question question, String answer, String module) {
+    public static void saveValuesText(QuestionDB question, String answer, String module) {
 
-        Value value = question.getValueBySession(module);
+        ValueDB value = question.getValueBySession(module);
 
         // If the value is not found we create one
         if (value == null) {
-            value = new Value(answer, question, Session.getSurveyByModule(module));
+            value = new ValueDB(answer, question, Session.getSurveyByModule(module));
             value.save();
+            DomainEventPublisher
+                    .instance()
+                    .publish(new ValueChangedEvent(Session.getSurveyByModule(module).getId_survey(),  new Question(question.getId_question(), question.getCompulsory()) ,ValueChangedEvent.Action.INSERT));
         } else {
             value.setOption((Long)null);
             value.setValue(answer);
@@ -104,12 +118,27 @@ public class ReadWriteDB {
         }
     }
 
-    public static void deleteValue(Question question, String module) {
+    public static boolean deleteValue(QuestionDB question, String module) {
+        return deleteValue(question, module, true);
+    }
 
-        Value value = question.getValueBySession(module);
+    public static boolean deleteValue(QuestionDB question, String module, boolean notifiyValueChanged) {
 
-        if (value != null)
+        ValueDB value = question.getValueBySession(module);
+
+        if (value != null) {
             value.delete();
+            if(notifiyValueChanged) {
+                DomainEventPublisher
+                        .instance()
+                        .publish(new ValueChangedEvent(
+                                Session.getSurveyByModule(module).getId_survey(),
+                                new Question(question.getId_question(), question.getCompulsory()),
+                                ValueChangedEvent.Action.DELETE));
+            }
+            return true;
+        }
+        return false;
     }
 
 }

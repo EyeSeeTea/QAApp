@@ -21,7 +21,7 @@ package org.eyeseetea.malariacare.data.database.utils.feedback;
 
 /**
  * Base class for every feedback row:
- *  - CompositeScore
+ *  - CompositeScoreDB
  *  - Question
  *
  * Created by arrizabalaga on 14/09/15.
@@ -39,4 +39,10 @@ public interface Feedback {
      * @return true|false
      */
     boolean isPassed();
+
+    /**
+     * Returns if 'this' row has media according to its question
+     * @return true|false
+     */
+    boolean hasMedia();
 }

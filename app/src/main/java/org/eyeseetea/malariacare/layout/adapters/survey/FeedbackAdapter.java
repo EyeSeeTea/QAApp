@@ -21,19 +21,13 @@ package org.eyeseetea.malariacare.layout.adapters.survey;
 
 import android.content.Context;
 import android.content.Intent;
-import android.content.res.AssetFileDescriptor;
 import android.graphics.Typeface;
 import android.graphics.drawable.Drawable;
-import android.media.MediaMetadataRetriever;
 import android.net.Uri;
 import android.support.v4.content.FileProvider;
 import android.support.v4.content.res.ResourcesCompat;
 import android.text.Html;
-import android.text.Spannable;
-import android.text.Spanned;
 import android.text.method.LinkMovementMethod;
-import android.text.style.ClickableSpan;
-import android.util.Log;
 import android.util.TypedValue;
 import android.view.LayoutInflater;
 import android.view.View;
@@ -43,22 +37,19 @@ import android.widget.ImageView;
 import android.widget.LinearLayout;
 import android.widget.RelativeLayout;
 import android.widget.TextView;
-import android.widget.Toast;
 
-import org.eyeseetea.malariacare.BaseActivity;
 import org.eyeseetea.malariacare.BuildConfig;
 import org.eyeseetea.malariacare.DashboardActivity;
 import org.eyeseetea.malariacare.R;
 import org.eyeseetea.malariacare.VideoActivity;
-import org.eyeseetea.malariacare.data.database.model.Media;
+import org.eyeseetea.malariacare.data.database.model.MediaDB;
 import org.eyeseetea.malariacare.data.database.utils.PreferencesState;
 import org.eyeseetea.malariacare.data.database.utils.feedback.CompositeScoreFeedback;
 import org.eyeseetea.malariacare.data.database.utils.feedback.Feedback;
 import org.eyeseetea.malariacare.data.database.utils.feedback.QuestionFeedback;
-import org.eyeseetea.malariacare.network.CustomParser;
+import org.eyeseetea.malariacare.utils.CustomParser;
 import org.eyeseetea.malariacare.utils.Constants;
-import org.eyeseetea.malariacare.utils.FileIOUtils;
-import org.eyeseetea.malariacare.views.CustomTextView;
+import org.eyeseetea.sdk.common.VideoUtils;
 
 import java.io.File;
 import java.util.ArrayList;
@@ -74,6 +65,8 @@ public class FeedbackAdapter extends BaseAdapter {
     private Context context;
 
     private boolean onlyFailed;
+
+    private boolean onlyMedia;
 
     private boolean [] hiddenPositions;
 
@@ -96,14 +89,17 @@ public class FeedbackAdapter extends BaseAdapter {
 
     @Override
     public int getCount() {
-        int hiddenItems=this.onlyFailed?countHiddenUpTo(this.items.size()):0;
+        int hiddenItems = 0;
+        if(onlyFailed || onlyMedia) {
+             hiddenItems = countHiddenUpTo(this.items.size());
+        }
         return this.items.size()-hiddenItems;
     }
 
     @Override
     public Object getItem(int position) {
         //Show all -> direct
-        if(!onlyFailed){
+        if(!onlyFailed && !onlyMedia){
             return this.items.get(position);
         }
 
@@ -144,7 +140,33 @@ public class FeedbackAdapter extends BaseAdapter {
     private View getViewByCompositeScoreFeedback(CompositeScoreFeedback feedback, ViewGroup parent, String module){
         LayoutInflater inflater=LayoutInflater.from(context);
         LinearLayout rowLayout = (LinearLayout)inflater.inflate(R.layout.feedback_composite_score_row, parent, false);
-        rowLayout.setBackgroundResource(feedback.getBackgroundColor());
+
+        hiddenArrowOnCompositeScoreWithNoVisibleQuestion(feedback, rowLayout);
+        if(!feedback.isShown()){
+            rowLayout.setVisibility(View.GONE);
+            View view = new View(parent.getContext());
+            view.setVisibility(View.GONE);
+            return view;
+        }else{
+            rowLayout.setVisibility(View.VISIBLE);
+        }
+
+        rowLayout.findViewById(R.id.cs_header).setBackgroundResource(feedback.getBackgroundColor());
+
+        ImageView imageView = (ImageView)rowLayout.findViewById(R.id.feedback_image);
+        imageView.setBackgroundResource(feedback.getBackgroundColor());
+        if(feedback.getFeedbackList().size()==0 && feedback.getCompositeScoreFeedbackList().size()==0){
+            imageView.setVisibility(View.GONE);
+        }else{
+            if((feedback.getFeedbackList().size()>0 && feedback.getFeedbackList().get(0).isShown()) ||
+                    (feedback.getCompositeScoreFeedbackList().size()>0 && feedback.getCompositeScoreFeedbackList().get(0).isShown()))
+            {
+                imageView.setImageDrawable(parent.getContext().getResources().getDrawable(R.drawable.ic_media_arrow_up));
+            }else{
+                imageView.setImageDrawable(parent.getContext().getResources().getDrawable(R.drawable.ic_media_arrow));
+            }
+
+        }
 
         //CompositeScore title
         TextView textView = (TextView) rowLayout.findViewById(R.id.feedback_label);
@@ -162,6 +184,7 @@ public class FeedbackAdapter extends BaseAdapter {
 
         //CompositeScore title
         textView=(TextView)rowLayout.findViewById(R.id.feedback_score_label);
+
         if(!PreferencesState.getInstance().isVerticalDashboard()){
             if(feedback.getScore(idSurvey, module)< Constants.MAX_RED)
                 textView.setTextColor(PreferencesState.getInstance().getContext().getResources().getColor(R.color.darkRed));
@@ -172,17 +195,63 @@ public class FeedbackAdapter extends BaseAdapter {
         }
         textView.setText(feedback.getPercentageAsString(idSurvey, module));
 
+        rowLayout.setTag(feedback);
+        rowLayout.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                CompositeScoreFeedback compositeScoreFeedback=(CompositeScoreFeedback)v.getTag();
+                compositeScoreFeedback.toggleChildrenShown(false);
+                notifyDataSetChanged();
+            }
+        });
+
         return rowLayout;
+    }
+
+    private void hiddenArrowOnCompositeScoreWithNoVisibleQuestion(CompositeScoreFeedback feedback,
+            LinearLayout rowLayout) {
+        if(feedback.getCompositeScoreFeedbackList().size()==0 && feedback.getFeedbackList().size()>0 && (onlyFailed || onlyMedia)) {
+            int countOfHiddenQuestions=0;
+            for (QuestionFeedback questionFeedback : feedback.getFeedbackList()) {
+                if(onlyFailed && onlyMedia) {
+                    if (questionFeedback.isPassed() || !questionFeedback.hasMedia()) {
+                        countOfHiddenQuestions++;
+                    }
+                }else if (onlyMedia){
+                    if (!questionFeedback.hasMedia()) {
+                        countOfHiddenQuestions++;
+                    }
+                }else if (onlyFailed){
+                    if (questionFeedback.isPassed()) {
+                        countOfHiddenQuestions++;
+                    }
+                }
+            }
+            if(countOfHiddenQuestions==feedback.getFeedbackList().size()){
+                rowLayout.findViewById(R.id.feedback_image).setVisibility(View.GONE);
+            }else{
+                rowLayout.findViewById(R.id.feedback_image).setVisibility(View.VISIBLE);
+            }
+        }
     }
 
     private View getViewByQuestionFeedback(QuestionFeedback feedback, View convertView, ViewGroup parent){
         if(onlyFailed && feedback.isPassed()){
             return null;
         }
-
         LayoutInflater inflater=LayoutInflater.from(context);
         LinearLayout rowLayout = (LinearLayout)inflater.inflate(R.layout.feedback_question_row, parent, false);
         rowLayout.setTag(feedback);
+
+        if(!feedback.isShown()){
+            rowLayout.setVisibility(View.GONE);
+            View view = new View(parent.getContext());
+            view.setVisibility(View.GONE);
+            return view;
+        }else{
+            rowLayout.setVisibility(View.VISIBLE);
+        }
+
         //Question label
         TextView textView=(TextView)rowLayout.findViewById(R.id.feedback_question_label);
         if(!PreferencesState.getInstance().isVerticalDashboard()){
@@ -192,7 +261,16 @@ public class FeedbackAdapter extends BaseAdapter {
             textView.setTypeface(Typeface.defaultFromStyle(Typeface.BOLD));
         }
 
-        textView.setText(feedback.getLabel());
+        String compulsoryMark="";
+        if(feedback.getQuestion().getCompulsory()) {
+            int red = PreferencesState.getInstance().getContext().getResources().getColor(
+                    R.color.darkRed);
+            String appNameColorString = String.format("%X", red).substring(2);
+            compulsoryMark = String.format("<font color=\"#%s\"><b>", appNameColorString) + "*  "
+                    + "</b></font>";
+        }
+
+        textView.setText(Html.fromHtml(compulsoryMark+feedback.getLabel()));
 
         if(PreferencesState.getInstance().isDevelopOptionActive()){
             textView=(TextView)rowLayout.findViewById(R.id.feedback_uid);
@@ -201,7 +279,7 @@ public class FeedbackAdapter extends BaseAdapter {
             textView.setMovementMethod(LinkMovementMethod.getInstance());
         }
         //Option label
-        textView=(TextView)rowLayout.findViewById(R.id.feedback_option_label);
+        textView=(TextView)rowLayout.findViewById(R.id.feedback_option_value);
         if(!PreferencesState.getInstance().isVerticalDashboard())
             textView.setTextColor(PreferencesState.getInstance().getContext().getResources().getColor(R.color.darkGrey));
         textView.setText(feedback.getOption());
@@ -251,8 +329,8 @@ public class FeedbackAdapter extends BaseAdapter {
      */
     private void addAllMedia(LinearLayout rowLayout, QuestionFeedback feedback) {
         LinearLayout feedbackContainer = (LinearLayout)rowLayout.findViewById(R.id.feedback_container);
-        List<Media> mediaList = feedback.getMedia();
-        for(Media media:mediaList){
+        List<MediaDB> mediaList = feedback.getMedia();
+        for(MediaDB media:mediaList){
             if(media.getMediaType()==Constants.MEDIA_TYPE_IMAGE){
                 addImage(feedbackContainer,media);
             }else{
@@ -267,7 +345,7 @@ public class FeedbackAdapter extends BaseAdapter {
      * @param rowLayout
      * @param media
      */
-    private void addImage(LinearLayout rowLayout, final Media media) {
+    private void addImage(LinearLayout rowLayout, final MediaDB media) {
         if(media !=null && media.getFilename()==null){
             rowLayout.addView(setDrawableOnLayout(rowLayout, R.drawable.no_image));
         } else {
@@ -308,7 +386,7 @@ public class FeedbackAdapter extends BaseAdapter {
      * @param rowLayout
      * @param media
      */
-    private void addVideo(LinearLayout rowLayout, Media media){
+    private void addVideo(LinearLayout rowLayout, MediaDB media){
         if(media !=null && media.getFilename()==null){
             rowLayout.addView(setDrawableOnLayout(rowLayout, R.drawable.no_video));
         }
@@ -333,8 +411,8 @@ public class FeedbackAdapter extends BaseAdapter {
             });
 
             //add preview frame
-            addPreview((ImageView) mediaLayout.findViewById(R.id.feedback_media_preview), media);
-
+            ImageView imageView = (ImageView) mediaLayout.findViewById(R.id.feedback_media_preview);
+            imageView.setImageBitmap(VideoUtils.getVideoPreview(media.getFilename(), context));
             //Add media row to feedback layout
             rowLayout.addView(mediaLayout);
         }
@@ -348,31 +426,6 @@ public class FeedbackAdapter extends BaseAdapter {
         ((ImageView) mediaLayout.findViewById(R.id.feedback_media_preview)).setImageDrawable(drawable);
         //Add media row to feedback layout
         return mediaLayout;
-    }
-
-    private void addPreview(ImageView viewMediaLink, Media media) {
-        MediaMetadataRetriever retriever = new MediaMetadataRetriever();
-        File mediaFile = new File(media.getFilename());
-        if (!mediaFile.exists()) {//load from raw
-            AssetFileDescriptor afd = FileIOUtils.getAssetFileDescriptorFromRaw(
-                    media.getFilename());
-            retriever.setDataSource(afd.getFileDescriptor(), afd.getStartOffset(), afd.getLength());
-        } else {
-            retriever.setDataSource(mediaFile.getAbsolutePath());
-        }
-        try {
-            viewMediaLink.setImageBitmap(
-                    retriever.getFrameAtTime(10000000, MediaMetadataRetriever.OPTION_CLOSEST));
-        } catch (RuntimeException ex) {
-            ex.printStackTrace();
-        } finally {
-            try {
-                retriever.release();
-            } catch (RuntimeException ex) {
-                ex.printStackTrace();
-                Log.e("error", "error releasign el video");
-            }
-        }
     }
 
     private void toggleFeedback(LinearLayout rowLayout, boolean visible) {
@@ -398,11 +451,24 @@ public class FeedbackAdapter extends BaseAdapter {
      */
     public void toggleOnlyFailed(){
         this.onlyFailed=!this.onlyFailed;
+        reloadHiddenPositions();
         notifyDataSetChanged();
     }
 
     public boolean isOnlyFailed() {
         return onlyFailed;
+    }
+    /**
+     * Toggles the state of the flag that determines if only 'failed' questions are shown
+     */
+    public void toggleOnlyMedia(){
+        this.onlyMedia=!this.onlyMedia;
+        reloadHiddenPositions();
+        notifyDataSetChanged();
+    }
+
+    public boolean isOnlyMedia() {
+        return onlyMedia;
     }
 
     /**
@@ -414,7 +480,13 @@ public class FeedbackAdapter extends BaseAdapter {
 
         for(int i=0;i<this.hiddenPositions.length;i++){
             //Passed items might get hidden
-            this.hiddenPositions[i]=this.items.get(i).isPassed();
+            if(onlyFailed && onlyMedia) {
+                this.hiddenPositions[i] = (this.items.get(i).isPassed() || !this.items.get(i).hasMedia());
+            }else if(onlyMedia){
+                this.hiddenPositions[i] = !this.items.get(i).hasMedia();
+            }else if (onlyFailed){
+                this.hiddenPositions[i] = (this.items.get(i).isPassed());
+            }
         }
     }
 

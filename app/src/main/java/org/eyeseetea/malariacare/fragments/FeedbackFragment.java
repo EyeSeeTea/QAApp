@@ -33,13 +33,14 @@ import android.util.Log;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
+import android.widget.ImageButton;
 import android.widget.ListView;
 import android.widget.ProgressBar;
 import android.widget.RelativeLayout;
 
 import org.eyeseetea.malariacare.DashboardActivity;
 import org.eyeseetea.malariacare.R;
-import org.eyeseetea.malariacare.data.database.model.Survey;
+import org.eyeseetea.malariacare.data.database.model.SurveyDB;
 import org.eyeseetea.malariacare.data.database.utils.Session;
 import org.eyeseetea.malariacare.data.database.utils.feedback.Feedback;
 import org.eyeseetea.malariacare.layout.adapters.survey.FeedbackAdapter;
@@ -74,6 +75,11 @@ public class FeedbackFragment extends Fragment implements IModuleFragment {
      * Checkbox that toggle between all|failed questions
      */
     private CustomRadioButton chkFailed;
+
+    /**
+     * Checkbox that toggle between all|containing media questions
+     */
+    private CustomRadioButton chkMedia;
     /**
      * planAction that toggle between all|failed questions
      */
@@ -162,6 +168,8 @@ public class FeedbackFragment extends Fragment implements IModuleFragment {
                 Session.getSurveyByModule(module).getId_survey(), module);
         feedbackListView = (ListView) llLayout.findViewById(R.id.feedbackListView);
         feedbackListView.setAdapter(feedbackAdapter);
+        feedbackListView.setDivider(null);
+        feedbackListView.setDividerHeight(0);
 
         //And checkbox listener
         chkFailed = (CustomRadioButton) llLayout.findViewById(R.id.chkFailed);
@@ -175,6 +183,17 @@ public class FeedbackFragment extends Fragment implements IModuleFragment {
                                          }
                                      }
         );
+        chkMedia = (CustomRadioButton) llLayout.findViewById(R.id.chkMedia);
+        chkMedia.setChecked(false);
+        chkMedia.setOnClickListener(new View.OnClickListener() {
+                                         @Override
+                                         public void onClick(View v) {
+                                             feedbackAdapter.toggleOnlyMedia();
+                                             ((CustomRadioButton) v).setChecked(feedbackAdapter
+                                                     .isOnlyMedia());
+                                         }
+                                     }
+        );
         planAction = (CustomButton) llLayout.findViewById(R.id.action_plan);
         planAction.setOnClickListener(new View.OnClickListener() {
                                          @Override
@@ -183,7 +202,7 @@ public class FeedbackFragment extends Fragment implements IModuleFragment {
                                          }
                                      }
         );
-        CustomRadioButton goback = (CustomRadioButton) llLayout.findViewById(
+        ImageButton goback = (ImageButton) llLayout.findViewById(
                 R.id.backToSentSurveys);
         goback.setOnClickListener(new View.OnClickListener() {
                                       @Override
@@ -194,7 +213,7 @@ public class FeedbackFragment extends Fragment implements IModuleFragment {
         );
 
         //Set mainscore and color.
-        Survey survey = Session.getSurveyByModule(module);
+        SurveyDB survey = Session.getSurveyByModule(module);
         if (survey.hasMainScore()) {
             float average = survey.getMainScore();
             CustomTextView item = (CustomTextView) llLayout.findViewById(R.id.feedback_total_score);

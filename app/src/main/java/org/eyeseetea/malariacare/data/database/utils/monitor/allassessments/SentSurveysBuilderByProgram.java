@@ -23,8 +23,9 @@ import android.content.Context;
 import android.util.Log;
 import android.webkit.WebView;
 
-import org.eyeseetea.malariacare.data.database.model.Program;
-import org.eyeseetea.malariacare.data.database.model.Survey;
+import org.eyeseetea.malariacare.data.database.model.ProgramDB;
+import org.eyeseetea.malariacare.data.database.model.SurveyDB;
+import org.eyeseetea.malariacare.data.database.utils.PreferencesState;
 
 import java.util.ArrayList;
 import java.util.Date;
@@ -44,7 +45,7 @@ public class SentSurveysBuilderByProgram extends  SentSurveysBuilderBase {
     /**
      * List of sent surveys
      */
-    List<Program>  programs;
+    List<ProgramDB>  programs;
     /**
      * Default constructor
      *
@@ -52,7 +53,7 @@ public class SentSurveysBuilderByProgram extends  SentSurveysBuilderBase {
      * @param context
      * @param programs
      */
-    public SentSurveysBuilderByProgram(List<Survey> surveyList, Context context, List<Program> programs) {
+    public SentSurveysBuilderByProgram(List<SurveyDB> surveyList, Context context, List<ProgramDB> programs) {
         super(surveyList, context);
         this.programs=programs;
         sentSurveysChartMap= new HashMap<>();
@@ -64,7 +65,7 @@ public class SentSurveysBuilderByProgram extends  SentSurveysBuilderBase {
      */
     public void addDataInChart(WebView webView) {
         //Build entries
-        for (Program program : programs) {
+        for (ProgramDB program : programs) {
             this.program = program;
             build(surveyList);
             //Take only 6 months from now
@@ -87,7 +88,7 @@ public class SentSurveysBuilderByProgram extends  SentSurveysBuilderBase {
             EntrySentSurveysChartByProgram entryMonth=sentSurveysChartMap.get(currentMonth+program.getUid());
             //No entry for this month ->0
             if(entryMonth==null){
-                entryMonth=new EntrySentSurveysChartByProgram(EXPECTED_SENT_SURVEYS_PER_MONTH,iMonth,program);
+                entryMonth=new EntrySentSurveysChartByProgram(PreferencesState.getInstance().getMonitoringTarget(),iMonth,program);
             }
             //Whatever was calculated
             last6entries.add(0,entryMonth);
@@ -101,8 +102,6 @@ public class SentSurveysBuilderByProgram extends  SentSurveysBuilderBase {
      * @param entries List of entries for the chart
      */
     private void injectDataInChart(WebView webView, List<EntrySentSurveysChartByProgram> entries){
-        //Set chart title
-        injectChartTitle(webView);
 
         //Add data to the chart
         for(EntrySentSurveysChartByProgram entry:entries){
@@ -116,8 +115,8 @@ public class SentSurveysBuilderByProgram extends  SentSurveysBuilderBase {
      * @param surveys List of sent surveys to create the list
      * @return
      */
-    public void build(List<Survey> surveys){
-        for(Survey survey:surveys){
+    public void build(List<SurveyDB> surveys){
+        for(SurveyDB survey:surveys){
             if(survey.getProgram().equals(program)) {
 
                 //Get the month for the survey (key)
@@ -127,7 +126,7 @@ public class SentSurveysBuilderByProgram extends  SentSurveysBuilderBase {
 
                 //First time no entry
                 if (entrySentSurveysChartByProgram == null) {
-                    entrySentSurveysChartByProgram = new  EntrySentSurveysChartByProgram(EXPECTED_SENT_SURVEYS_PER_MONTH, survey.getCompletionDate(), program);
+                    entrySentSurveysChartByProgram = new  EntrySentSurveysChartByProgram(PreferencesState.getInstance().getMonitoringTarget(), survey.getCompletionDate(), program);
                     sentSurveysChartMap.put(month+program.getUid(), entrySentSurveysChartByProgram);
                 }
                 entrySentSurveysChartByProgram.incSent();

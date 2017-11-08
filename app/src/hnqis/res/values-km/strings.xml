@@ -47,6 +47,7 @@
 <string name="assessment_sent_date">"កាលបរិច្ឆេទ"</string>
 <string name="assessment_title_header">"ការបញ្ជូនមិនទាន់សម្រេច"</string>
 <string name="assessment_sent_title_header">"ការស្ទង់មតិ​ បានផ្ញើចេញ"</string>
+<string name="assessment_sent_score">Score</string>
 
 <!-- survey -->
 <string name="survey_title_exit">"Really Exit?"</string>
@@ -81,7 +82,7 @@ Prescribed?"</string>
 <string name="reporting_info_reporting">"Reporting"</string>
 <string name="reporting_info_results">"Results"</string>
 <string name="reporting_info_register">"Register"</string>
-<string name="reporting_info_monthly">"Monthly 
+<string name="reporting_info_monthly">"Monthly
 Report"</string>
 
 <!-- score -->
@@ -104,12 +105,11 @@ evaluation"</string>
 
 <!-- settings -->
 <string name="title_activity_settings">"ការកំនត់"</string>
-    <string name="settings_checkbox_customize_fonts">"ប្តូរពុម្ពអក្សរ?"</string>
+<string name="settings_checkbox_customize_fonts">"ប្តូរពុម្ពអក្សរ?"</string>
 <string name="settings_list_font_sizes">"ទំហំពុម្ពអក្សរ"</string>
 <string name="settings_text_dhis_server_url">"DHIS Server URL"</string>
 <string name="settings_text_dhis_user">"DHIS user"</string>
-<string name="pref_header_general">"General"</string>
-    <string name="dialog_info_push_bad_credentials">"លិខិត​សម្គាល់​អាក្រក់​សម្រាប់​ជំរុញ​ឱ្យ​មាន "</string>
+<string name="dialog_info_push_bad_credentials">"លិខិត​សម្គាល់​អាក្រក់​សម្រាប់​ជំរុញ​ឱ្យ​មាន "</string>
 <string name="dialog_info_push_empty_survey">"Empty surveys cannot be pushed"</string>
 <string name="settings_menu_legal">"Legal"</string>
 <string name="settings_menu_copyright">"Copyright"</string>
@@ -133,8 +133,8 @@ evaluation"</string>
 <string name="dashboard_title_planned_productivity">"Prd"</string>
 <string name="dashboard_title_planned_quality_of_care">"QoC"</string>
 <string name="dashboard_title_planned_next_qa">"Next QA"</string>
-<string name="assessment_sent_score">"Score"</string>
 <string name="feedback_show_only_failed">"Show only failed questions"</string>
+<string name="feedback_show_only_media">"បង្ហាញតែសំណួរដែលមានវីដេអូ / រូបភាព"</string>
 <string name="feedback_show_only_one_or_show_all">"បង្ហាញតែមតិយោបល់ចុងក្រោយក្នុងមួយកម្មវិធី / PUll"</string>
 <string name="feedback_return">"Return to all assessments"</string>
 <string name="quality_of_care">"Quality of Care (QoC) Score:"</string>
@@ -154,6 +154,7 @@ evaluation"</string>
 <string name="server_url">"DHIS2 server"</string>
 <string name="settings_text_dhis_password">"DHIS password"</string>
 <string name="settings_text_dhis_max_items">"DHIS max loaded surveys"</string>
+<string name="settings_monitoring_target">"គោលដៅតាមដាន"</string>
 <string name="dialog_error_push_uids">"Incorrect UIDs found in push"</string>
 <string name="dialog_error_push_no_location_and_required">"No location available and it is a required field"</string>
 <string name="dialog_info_push_imported">"Imported"</string>
@@ -176,8 +177,8 @@ evaluation"</string>
 <string name="progress_pull_surveys">"កំពុងទាញការស្ទង់មតិ..."</string>
 <string name="progress_pull_done">"រួចរាល់"</string>
 <string name="dialog_push_success">"ការស្ទង់មតិបានបញ្ជូនចូលទៅកាន់ម៉ាស៊ីនបម្រើ DHIS ដោយជោគជ័យ"</string>
-    <string name="planning_title_dialog">"Schedule survey"</string>
-<string name="planning_label_comment">"* Comment"</string>
+<string name="planning_title_dialog">"Schedule survey"</string>
+<string name="planning_label_comment">"Comment"</string>
 <string name="planning_label_schedule_date">"* Scheduled Date"</string>
 <string name="option_edit">"Edit"</string>
 <string name="option_mark_completed">"Mark as completed"</string>
@@ -188,12 +189,12 @@ evaluation"</string>
 <string name="assess">"Assess - active surveys"</string>
 <string name="improve">"Improve"</string>
 <string name="monitor">"Monitor"</string>
-<string name="filter_all_org_units">"all org units"</string>
-<string name="filter_all_org_assessments">"all assessments"</string>
+<string name="filter_all_org_units">"គ្រឿងអេកូទាំងអស់"</string>
+<string name="filter_all_org_assessments">"ទាំងអស់វាយតម្លៃ"</string>
 <string name="dialog_content_dhis_preference_login">"Changing the server needs to re-login. Every not-sent survey will be deleted. Are you sure you want to continue?"</string>
 <string name="lastcommit">"Version %s"</string>
 <string name="unavailable">"Unavailable"</string>
-    <string name="error_message_push">"ព្រឹត្តិការណ៍នេះជាមួយនឹងលេខសម្គាល់អ្នកប្រើ %s ។ ត្រូវបានផ្ទុកឡើងដោយគ្មានកាលបរិច្ឆេទ។ សូមទាក់ទងអ្នកគ្រប់គ្រង។"</string>
+<string name="error_message_push">"ព្រឹត្តិការណ៍នេះជាមួយនឹងលេខសម្គាល់អ្នកប្រើ %s ។ ត្រូវបានផ្ទុកឡើងដោយគ្មានកាលបរិច្ឆេទ។ សូមទាក់ទងអ្នកគ្រប់គ្រង។"</string>
 <string name="monitor_js_assessments">"ការវាយតម្លៃអនុវត្ត"</string>
 <string name="monitor_js_target">"\"គោលដៅ\""</string>
 <string name="monitor_js_quality_of_care">"\"គុណភាពនៃការថែទាំ: មុន \""</string>
@@ -261,7 +262,19 @@ evaluation"</string>
 <string name="critical_steps">ជំហានរិះគន់ខកខាន:</string>
 <string name="url_not_available">URL មិនទាន់មានទេ</string>
 <string name="see_full_assessment">មើលការវាយតម្លៃពេញលេញនៅ</string>
+<string name="pref_header_general">General</string>
+<string name="install_file_manager">សូមដំឡើងកម្មវិធីគ្រប់គ្រងឯកសារមួយ។</string>
+<string name="get_db_file_dialog">សូមជ្រើសឯកសារមូលដ្ឋានទិន្នន័យដែលមានសុពលភាព</string>
+<string name="start">Start</string>
 <string name="on">"លើ"</string>
+
+<string name="add">"បន្ថែម"</string>
+<string name="change_date">"ផ្លាស់ប្ដូរកាលបរិច្ឆេទ"</string>
+<string name="show_history">"កំណត់ប្រវត្តិសាស្រ្ត"</string>
+<string name="comments">"យោបល់"</string>
+<string name="dates">"កាលបរិច្ឆេទពីមុន"</string>
+<string name="mark_complete">"សម្គាល់បញ្ចប់"</string>
 <string name="plain_text">"អត្ថបទធម្មតា "</string>
 <string name="html_text">"អត្ថបទដែលបានធ្វើទ្រង់ទ្រាយ "</string>
+<string name="schedule_title">"កំណត់កាលវិភាគស្ទង់មតិ"</string>
 </resources>

@@ -1,5 +1,6 @@
 package org.eyeseetea.malariacare.data.database.utils.planning;
 
+import android.app.AlertDialog;
 import android.app.DatePickerDialog;
 import android.app.Dialog;
 import android.content.Context;
@@ -10,44 +11,50 @@ import android.widget.DatePicker;
 import android.widget.EditText;
 
 import org.eyeseetea.malariacare.R;
-import org.eyeseetea.malariacare.data.database.model.Survey;
+import org.eyeseetea.malariacare.data.database.model.SurveyDB;
 import org.eyeseetea.malariacare.data.database.utils.PreferencesState;
 import org.eyeseetea.malariacare.services.SurveyService;
 import org.eyeseetea.malariacare.utils.AUtils;
+import org.eyeseetea.sdk.presentation.views.CustomEditText;
 
 import java.util.Calendar;
 import java.util.Date;
 import java.util.List;
 
-/**
- * Created by ina on 16/08/2016.
- */
 public class ScheduleListener implements View.OnClickListener {
-    Survey survey;
+    private AlertDialog mAlertDialog;
+    SurveyDB survey;
     Date newScheduledDate;
     Context context;
-    List<Survey> plannedSurveys;
-    public ScheduleListener(Survey survey, Context context){this.survey=survey; this.context=context;}
+    List<SurveyDB> plannedSurveys;
+    public ScheduleListener(SurveyDB survey, Context context){this.survey=survey; this.context=context;}
 
-    public ScheduleListener(List<Survey> plannedSurveys, Context applicationContext) {
+    public ScheduleListener(List<SurveyDB> plannedSurveys, Context applicationContext) {
         this.context=applicationContext;
         this.plannedSurveys=plannedSurveys;
         survey=plannedSurveys.get(0);
         createScheduleDialog();
     }
 
+    public void addAlertDialog(AlertDialog alertDialog){
+        mAlertDialog = alertDialog;
+    }
+
     @Override
     public void onClick(View v){
         createScheduleDialog();
+        if(mAlertDialog!=null) {
+            mAlertDialog.dismiss();
+        }
     }
 
-    private void createScheduleDialog() {
+    public void createScheduleDialog() {
         final Dialog dialog = new Dialog(context);
         dialog.setContentView(R.layout.planning_schedule_dialog);
         dialog.setTitle(R.string.planning_title_dialog);
 
         //Set current date
-        final Button scheduleDatePickerButton=(Button)dialog.findViewById(R.id.planning_dialog_picker_button);
+        final CustomEditText scheduleDatePickerButton=(CustomEditText)dialog.findViewById(R.id.planning_dialog_picker_button);
         scheduleDatePickerButton.setText(AUtils.formatDate(survey.getScheduledDate()));
         //On Click open an specific DatePickerDialog
         scheduleDatePickerButton.setOnClickListener(new View.OnClickListener() {
@@ -95,7 +102,7 @@ public class ScheduleListener implements View.OnClickListener {
                     survey.reschedule(newScheduledDate, comment);
                 }
                 else {
-                    for(Survey survey:plannedSurveys){
+                    for(SurveyDB survey:plannedSurveys){
                         survey.reschedule(newScheduledDate,comment);
                     }
                 }
