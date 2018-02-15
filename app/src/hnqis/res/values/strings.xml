@@ -256,4 +256,5 @@ evaluation"</string>
 
 <string name="plain_text">Plain text </string>
 <string name="html_text">Formatted text </string>
+<string name="monitor_no_surveys_to_show">"No surveys to show"</string>
 </resources>

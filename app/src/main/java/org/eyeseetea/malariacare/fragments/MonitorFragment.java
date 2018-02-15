@@ -42,16 +42,18 @@ import org.eyeseetea.malariacare.data.database.model.Survey;
 import org.eyeseetea.malariacare.data.database.utils.PreferencesState;
 import org.eyeseetea.malariacare.data.database.utils.Session;
 import org.eyeseetea.malariacare.data.database.utils.monitor.MonitorMessagesBuilder;
-import org.eyeseetea.malariacare.data.database.utils.monitor.pie.PieBuilderBase;
-import org.eyeseetea.malariacare.data.database.utils.services.BaseServiceBundle;
-import org.eyeseetea.malariacare.data.database.utils.monitor.allassessments.SentSurveysBuilderByOrgUnit;
-import org.eyeseetea.malariacare.data.database.utils.monitor.allassessments.SentSurveysBuilderByProgram;
+import org.eyeseetea.malariacare.data.database.utils.monitor.allassessments.SentSurveysBuilderBase;
+import org.eyeseetea.malariacare.data.database.utils.monitor.allassessments
+        .SentSurveysBuilderByOrgUnit;
+import org.eyeseetea.malariacare.data.database.utils.monitor.allassessments
+        .SentSurveysBuilderByProgram;
 import org.eyeseetea.malariacare.data.database.utils.monitor.facility.FacilityTableBuilderBase;
 import org.eyeseetea.malariacare.data.database.utils.monitor.facility.FacilityTableBuilderByOrgUnit;
 import org.eyeseetea.malariacare.data.database.utils.monitor.facility.FacilityTableBuilderByProgram;
-import org.eyeseetea.malariacare.data.database.utils.monitor.allassessments.SentSurveysBuilderBase;
+import org.eyeseetea.malariacare.data.database.utils.monitor.pie.PieBuilderBase;
 import org.eyeseetea.malariacare.data.database.utils.monitor.pie.PieBuilderByOrgUnit;
 import org.eyeseetea.malariacare.data.database.utils.monitor.pie.PieBuilderByProgram;
+import org.eyeseetea.malariacare.data.database.utils.services.BaseServiceBundle;
 import org.eyeseetea.malariacare.layout.adapters.dashboard.IDashboardAdapter;
 import org.eyeseetea.malariacare.layout.dashboard.config.MonitorFilter;
 import org.eyeseetea.malariacare.services.SurveyService;
@@ -60,9 +62,6 @@ import java.util.ArrayList;
 import java.util.Iterator;
 import java.util.List;
 
-/**
- * Created by ignac on 10/12/2015.
- */
 public class MonitorFragment extends Fragment implements IModuleFragment{
     List<Survey> surveysForGraphic;
     public static final String TAG = ".MonitorFragment";
@@ -164,8 +163,10 @@ public class MonitorFragment extends Fragment implements IModuleFragment{
             surveyReceiver = null;
         }
     }
+
     public void reloadSentSurveys() {
         BaseServiceBundle data= (BaseServiceBundle) Session.popServiceValue(SurveyService.ALL_MONITOR_DATA_ACTION);
+
         if(data!=null) {
             surveysForGraphic = (List<Survey>)data.getModelList(Survey.class.getName());
             //Remove the bad surveys.
@@ -181,6 +182,12 @@ public class MonitorFragment extends Fragment implements IModuleFragment{
 
             reloadSurveys(surveysForGraphic,programs,orgUnits);
         }
+        showMessageNoAddedSurveys((surveysForGraphic == null || surveysForGraphic.isEmpty()));
+    }
+
+    private void showMessageNoAddedSurveys(boolean show) {
+        getActivity().findViewById(R.id.monitor_no_surveys_message).setVisibility(
+                show ? View.VISIBLE : View.GONE);
     }
 
     public void reloadSurveys(List<Survey> newListSurveys,List<Program> newListPrograms, List<OrgUnit> newListOrgUnit) {
@@ -205,48 +212,57 @@ public class MonitorFragment extends Fragment implements IModuleFragment{
             @Override
             public void onPageFinished(WebView view, String url) {
                 super.onPageFinished(view, url);
-                //Update hardcoded messages
-                new MonitorMessagesBuilder(getActivity()).addDataInChart(view);
+                if (getFragmentManager()!=null) getFragmentManager().executePendingTransactions();
+                if (isAdded()) {
+                    //Update hardcoded messages
+                    new MonitorMessagesBuilder(getActivity()).addDataInChart(view);
 
-                //Update hardcoded messages
-                new MonitorMessagesBuilder(getActivity()).addDataInChart(view);
+                    //Update hardcoded messages
+                    new MonitorMessagesBuilder(getActivity()).addDataInChart(view);
 
-                //Add line chart
-                if(isOrgUnitFilterActive()) {
-                    new SentSurveysBuilderByOrgUnit(surveysForGraphic, getActivity(), orgUnits).addDataInChart(view);
-                }
-                if(isProgramFilterActive()) {
-                    new SentSurveysBuilderByProgram(surveysForGraphic, getActivity(), programs).addDataInChart(view);
-                }
+                    //Add line chart
+                    if (isOrgUnitFilterActive()) {
+                        new SentSurveysBuilderByOrgUnit(surveysForGraphic, getActivity(),
+                                orgUnits).addDataInChart(view);
+                    }
+                    if (isProgramFilterActive()) {
+                        new SentSurveysBuilderByProgram(surveysForGraphic, getActivity(),
+                                programs).addDataInChart(view);
+                    }
 
-                //Show stats by program
-                SentSurveysBuilderBase.showData(view);
+                    //Show stats by program
+                    SentSurveysBuilderBase.showData(view);
 
-                //Add line chart
-                if(isOrgUnitFilterActive()) {
-                    new PieBuilderByOrgUnit(surveysForGraphic, getActivity()).addDataInChart(view);
-                }
-                if(isProgramFilterActive()) {
-                    new PieBuilderByProgram(surveysForGraphic, getActivity()).addDataInChart(view);
-                }
-                //Render the table and pie.
-                PieBuilderBase.showPieTab(view);
+                    //Add line chart
+                    if (isOrgUnitFilterActive()) {
+                        new PieBuilderByOrgUnit(surveysForGraphic, getActivity()).addDataInChart(
+                                view);
+                    }
+                    if (isProgramFilterActive()) {
+                        new PieBuilderByProgram(surveysForGraphic, getActivity()).addDataInChart(
+                                view);
+                    }
+                    //Render the table and pie.
+                    PieBuilderBase.showPieTab(view);
 
-                //Add line chart
-                if(isOrgUnitFilterActive()) {
-                    //facility by progam-> is a orgunit facility
-                    new FacilityTableBuilderByProgram(surveysForGraphic, getActivity()).addDataInChart(view);
-                    FacilityTableBuilderByOrgUnit.showFacilities(view);
-                }
-                if(isProgramFilterActive()) {
-                    //facility by orgunit-> is a program facility
-                    new FacilityTableBuilderByOrgUnit(surveysForGraphic, getActivity()).addDataInChart(view);
-                    FacilityTableBuilderByProgram.showFacilities(view);
-                }
+                    //Add line chart
+                    if (isOrgUnitFilterActive()) {
+                        //facility by progam-> is a orgunit facility
+                        new FacilityTableBuilderByProgram(surveysForGraphic,
+                                getActivity()).addDataInChart(view);
+                        FacilityTableBuilderByOrgUnit.showFacilities(view);
+                    }
+                    if (isProgramFilterActive()) {
+                        //facility by orgunit-> is a program facility
+                        new FacilityTableBuilderByOrgUnit(surveysForGraphic,
+                                getActivity()).addDataInChart(view);
+                        FacilityTableBuilderByProgram.showFacilities(view);
+                    }
 
-                //Draw facility main table
-                //Set the colors of red/green/yellow pie and table
-                FacilityTableBuilderBase.setColor(view);
+                    //Draw facility main table
+                    //Set the colors of red/green/yellow pie and table
+                    FacilityTableBuilderBase.setColor(view);
+                }
             }
         });
         //Load html
