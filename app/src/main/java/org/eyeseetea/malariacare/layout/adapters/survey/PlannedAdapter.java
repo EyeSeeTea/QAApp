@@ -319,7 +319,6 @@ public class PlannedAdapter extends BaseAdapter {
 
         //Planned survey -> onclick startSurvey
         actionButton.setOnClickListener(new CreateOrEditSurveyListener(plannedSurvey.getSurvey()));
-        rowLayout.setOnClickListener(new CreateOrEditSurveyListener(plannedSurvey.getSurvey()));
 
         return rowLayout;
     }
@@ -350,25 +349,6 @@ public class PlannedAdapter extends BaseAdapter {
         public void onClick(View v) {
             DashboardActivity activity = ((DashboardActivity) context);
             activity.onSurveySelected(survey);
-//            if(survey.getStatus()==Constants.SURVEY_PLANNED){
-//                survey=SurveyPlanner.getInstance().startSurvey(survey);
-//            }
-//
-//            Session.setSurveyByModule(survey);
-//            activity.prepareLocationListener(survey);
-//            //FIXME
-//
-//            activity.initSurveyFromPlanning();
-
-            // de development
-//            DashboardActivity activity = ((DashboardActivity) context);
-//            if(survey.getStatus()==Constants.SURVEY_PLANNED){
-//                survey=SurveyPlanner.getInstance().startSurvey(survey);
-//            }
-//            activity.prepareLocationListener(survey);
-//            //FIXME
-//
-//            activity.initSurveyFromPlanning(survey);
         }
     }
 
