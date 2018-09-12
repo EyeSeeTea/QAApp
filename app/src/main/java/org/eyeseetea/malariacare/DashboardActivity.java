@@ -33,25 +33,23 @@ import android.view.MenuItem;
 import android.view.View;
 import android.widget.Toast;
 
-import org.eyeseetea.malariacare.data.database.model.OrgUnit;
-import org.eyeseetea.malariacare.data.database.model.Program;
-import org.eyeseetea.malariacare.data.database.model.Survey;
-import org.eyeseetea.malariacare.data.database.model.User;
+import org.eyeseetea.malariacare.data.database.model.OrgUnitDB;
+import org.eyeseetea.malariacare.data.database.model.ProgramDB;
+import org.eyeseetea.malariacare.data.database.model.SurveyDB;
+import org.eyeseetea.malariacare.data.database.model.UserDB;
 import org.eyeseetea.malariacare.data.database.utils.PreferencesState;
 import org.eyeseetea.malariacare.data.database.utils.Session;
 import org.eyeseetea.malariacare.data.database.utils.metadata.PhoneMetaData;
 import org.eyeseetea.malariacare.data.database.utils.planning.SurveyPlanner;
+import org.eyeseetea.malariacare.data.remote.api.PullDhisApiDataSource;
 import org.eyeseetea.malariacare.drive.DriveRestController;
 import org.eyeseetea.malariacare.layout.dashboard.builder.AppSettingsBuilder;
 import org.eyeseetea.malariacare.layout.dashboard.controllers.DashboardController;
 import org.eyeseetea.malariacare.layout.dashboard.controllers.ImproveModuleController;
-import org.eyeseetea.malariacare.layout.dashboard.controllers.PlanModuleController;
-import org.eyeseetea.malariacare.network.PullClient;
+import org.eyeseetea.malariacare.layout.dashboard.controllers.ModuleController;
 import org.eyeseetea.malariacare.services.SurveyService;
 import org.eyeseetea.malariacare.utils.AUtils;
 import org.eyeseetea.malariacare.utils.Constants;
-
-import java.util.List;
 
 
 public class DashboardActivity extends BaseActivity {
@@ -91,6 +89,7 @@ public class DashboardActivity extends BaseActivity {
             //Media: init drive credentials
             DriveRestController.getInstance().init(this);
         }
+        reloadDashboard();
     }
 
 
@@ -138,7 +137,7 @@ public class DashboardActivity extends BaseActivity {
         }
 
         //Pull
-        final int unsentSurveysCount = Survey.countAllUnsentUnplannedSurveys();
+        final int unsentSurveysCount = SurveyDB.countAllUnsentUnplannedSurveys();
 
         //No unsent data -> pull (no confirmation)
         if (unsentSurveysCount == 0) {
@@ -199,6 +198,7 @@ public class DashboardActivity extends BaseActivity {
         super.onResume();
         getSurveysFromService();
         DriveRestController.getInstance().syncMedia();
+        DashboardActivity.dashboardActivity.reloadActiveTab();
     }
 
     @Override
@@ -218,7 +218,6 @@ public class DashboardActivity extends BaseActivity {
             reloadOnResume = true;
             return;
         }
-        reloadDashboard();
     }
 
     public static void reloadDashboard() {
@@ -254,44 +253,42 @@ public class DashboardActivity extends BaseActivity {
         // If we're in dashboard and User is not yet in session we have to put it
         // FIXME: for the moment there will be only one user in the User table, but in the future
         // we will have to think about tagging the logged user in the DB
-        User user = User.getLoggedUser();
+        UserDB user = UserDB.getLoggedUser();
         Session.setUser(user);
     }
 
     /**
      * Handler that starts or edits a given survey
      */
-    public void onSurveySelected(Survey survey) {
+    public void onSurveySelected(SurveyDB survey) {
         dashboardController.onSurveySelected(survey);
     }
 
     /**
      * Handler that starts or edits a given survey
      */
-    public void onOrgUnitSelected(OrgUnit orgUnit) {
+    public void onOrgUnitSelected(OrgUnitDB orgUnit) {
         dashboardController.onOrgUnitSelected(orgUnit);
     }
 
     /**
      * Handler that starts or edits a given survey
      */
-    public void onProgramSelected(Program program) {
+    public void onProgramSelected(ProgramDB program) {
         dashboardController.onProgramSelected(program);
-    }
-
-    /**
-     * Handler that marks the given sucloseFeedbackFragmentrvey as completed.
-     * This includes a pair or corner cases
-     */
-    public void onMarkAsCompleted(Survey survey) {
-        dashboardController.onMarkAsCompleted(survey);
     }
 
     /**
      * Handler that enter into the feedback for the given survey
      */
-    public void onFeedbackSelected(Survey survey) {
+    public void onFeedbackSelected(SurveyDB survey) {
         dashboardController.onFeedbackSelected(survey);
+    }
+
+
+
+    public void onPlanPerOrgUnitMenuClicked(SurveyDB survey) {
+        dashboardController.onPlanPerOrgUnitMenuClicked(survey);
     }
 
     /**
@@ -304,15 +301,15 @@ public class DashboardActivity extends BaseActivity {
     /**
      * Create new survey from CreateSurveyFragment
      */
-    public void onCreateSurvey(final OrgUnit orgUnit, final Program program) {
+    public void onCreateSurvey(final OrgUnitDB orgUnit, final ProgramDB program) {
         createNewSurvey(orgUnit, program);
     }
 
     /**
      * Create new survey from VariantSpecificUtils
      */
-    public void createNewSurvey(OrgUnit orgUnit, Program program) {
-        Survey survey = SurveyPlanner.getInstance().startSurvey(orgUnit, program);
+    public void createNewSurvey(OrgUnitDB orgUnit, ProgramDB program) {
+        SurveyDB survey = SurveyPlanner.getInstance().startSurvey(orgUnit, program);
         prepareLocationListener(survey);
         // Put new survey in session
         Session.setSurveyByModule(survey, Constants.FRAGMENT_SURVEY_KEY);
@@ -369,46 +366,48 @@ public class DashboardActivity extends BaseActivity {
         }, 1000);
     }
 
-    public void preparePlanningFilters(List<Program> programList, List<OrgUnit> orgUnitList) {
-        ((PlanModuleController) dashboardController.getModuleByName(
-                PlanModuleController.getSimpleName())).prepareFilters(programList, orgUnitList);
-    }
-
-    @Override
-    public void clickOrgUnitSpinner(View v) {
-        PlanModuleController planModuleController =
-                (PlanModuleController) dashboardController.getModuleByName(
-                        PlanModuleController.getSimpleName());
-        planModuleController.clickOrgUnitSpinner();
-    }
-
-    @Override
-    public void clickProgramSpinner(View v) {
-        PlanModuleController planModuleController =
-                (PlanModuleController) dashboardController.getModuleByName(
-                        PlanModuleController.getSimpleName());
-        planModuleController.clickOrgProgramSpinner();
-    }
-
     public void openActionPlan() {
+        ImproveModuleController improveModuleController =
+                (ImproveModuleController) dashboardController.getModuleByName(
+                        ImproveModuleController.getSimpleName());
+        improveModuleController.onPlanActionSelected(
+                Session.getSurveyByModule(improveModuleController.getName()));
+    }
+
+    public void openActionPlan(SurveyDB survey) {
         ImproveModuleController improveModuleController = (ImproveModuleController) dashboardController.getModuleByName(ImproveModuleController.getSimpleName());
-        improveModuleController.onPlanActionSelected(Session.getSurveyByModule(improveModuleController.getName()));
+        improveModuleController.onPlanActionSelected(survey);
+    }
+
+    public void onAssessSelected(SurveyDB survey) {
+        dashboardController.onAssessSelected(survey);
+    }
+
+    public void openFeedback(SurveyDB survey, boolean modifyFilter) {
+        dashboardController.openFeedback(survey, modifyFilter);
+    }
+
+    public void onPlannedSurvey(SurveyDB survey, View.OnClickListener scheduleClickListener) {
+        dashboardController.onPlannedSurvey(survey, scheduleClickListener);
+    }
+
+    public void reloadActiveTab() {
+        dashboardController.reloadActiveModule();
     }
 
 
     public class AsyncAnnouncement extends AsyncTask<Void, Void, Void> {
-        User loggedUser;
+        UserDB loggedUser;
 
         @Override
         protected Void doInBackground(Void... params) {
-            PullClient pullClient = new PullClient(PreferencesState.getInstance().getContext());
-            loggedUser = User.getLoggedUser();
+            loggedUser = UserDB.getLoggedUser();
             /* Ignoring the update date
             boolean isUpdated = pullClient.isUserUpdated(loggedUser);
             if (isUpdated) {
                 pullClient.pullUserAttributes(loggedUser);
             }*/
-            loggedUser = pullClient.pullUserAttributes(loggedUser);
+            loggedUser = PullDhisApiDataSource.pullUserAttributes(loggedUser);
             loggedUser.save();//save the lastUpdated info and attributes
             return null;
         }
@@ -417,15 +416,18 @@ public class DashboardActivity extends BaseActivity {
         protected void onPostExecute(Void aVoid) {
             super.onPostExecute(aVoid);
 
-            if (loggedUser.getAnnouncement() != null && !loggedUser.getAnnouncement().equals("")
-                    && !PreferencesState.getInstance().isUserAccept()) {
+            if (shouldDisplayAnnoucement()) {
                 Log.d(TAG, "show logged announcement");
                 AUtils.showAnnouncement(R.string.admin_announcement, loggedUser.getAnnouncement(),
                         DashboardActivity.this);
-                //show model dialog
             } else {
                 AUtils.checkUserClosed(loggedUser, DashboardActivity.this);
             }
+        }
+
+        private boolean shouldDisplayAnnoucement() {
+            return loggedUser.getAnnouncement() != null && !loggedUser.getAnnouncement().equals("")
+                    && !PreferencesState.getInstance().isUserAccept();
         }
     }
 }

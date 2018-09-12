@@ -6,25 +6,25 @@ import android.support.v7.widget.RecyclerView;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
+import android.widget.AdapterView;
 import android.widget.ImageView;
 
 import org.eyeseetea.malariacare.R;
-import org.eyeseetea.malariacare.data.database.model.Media;
-import org.eyeseetea.malariacare.utils.FileIOUtils;
+import org.eyeseetea.malariacare.data.database.model.MediaDB;
 import org.eyeseetea.malariacare.views.CustomTextView;
+import org.eyeseetea.sdk.common.FileUtils;
 
-import java.io.File;
-import java.text.DecimalFormat;
 import java.util.List;
 
 public class DownloadedMediaAdapter extends
         RecyclerView.Adapter<DownloadedMediaAdapter.MediaViewHolder> {
-    List<Media> items;
+    List<MediaDB> items;
     Context context;
     LayoutInflater lInflater;
     protected Integer rowLayout;
+    private AdapterView.OnItemClickListener mOnItemClickListener;
 
-    public DownloadedMediaAdapter(List<Media> items, Context context) {
+    public DownloadedMediaAdapter(List<MediaDB> items, Context context) {
         this.items = items;
         this.context = context;
         this.lInflater = LayoutInflater.from(context);
@@ -40,13 +40,13 @@ public class DownloadedMediaAdapter extends
     }
 
     @Override
-    public void onBindViewHolder(MediaViewHolder holder, int position) {
-        Media media = items.get(position);
+    public void onBindViewHolder(final MediaViewHolder holder, final int position) {
+        MediaDB media = items.get(position);
         if (media.getFilename() != null) {
-            holder.fileName.setText(removePathFromName(media.getFilename()));
+            holder.fileName.setText(FileUtils.removePathFromName(media.getFilename()));
         }
         if (media.getFilename() != null) {
-            holder.size.setText(getSizeInMB(media.getFilename()));
+            holder.size.setText(FileUtils.getSizeInMB(media.getFilename(), context));
         }
         if (media.isPicture()) {
             holder.icon.setImageDrawable(
@@ -56,38 +56,13 @@ public class DownloadedMediaAdapter extends
             holder.icon.setImageDrawable(
                     ContextCompat.getDrawable(context, R.drawable.ic_movie_black_18dp));
         }
-    }
-
-    private String getSizeInMB(String filename) {
-        String size = "0";
-        try {
-            File file = new File(filename);
-            double fileSizeInBytes;
-            if (file.exists()) {
-                fileSizeInBytes = file.length();
-            } else {
-                fileSizeInBytes = FileIOUtils.getAssetFileDescriptorFromRaw(filename).getLength();
+        holder.container.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                mOnItemClickListener.onItemClick(null, holder.container, position,
+                        getItemId(position));
             }
-            // Get length of file in bytes
-            // Convert the bytes to Kilobytes (1 KB = 1024 Bytes)
-            double fileSizeInKB = fileSizeInBytes / 1024.0;
-            // Convert the KB to MegaBytes (1 MB = 1024 KBytes)
-            double fileSizeInMB = fileSizeInKB / 1024.0;
-            if (fileSizeInKB < 1024.0) {
-                size = fixDecimals(fileSizeInMB, "0.000");
-            } else {
-                size = fixDecimals(fileSizeInMB, "#.0");
-            }
-        } catch (Exception e) {
-            e.printStackTrace();
-        }
-
-        return size + " MB";
-    }
-
-    private String fixDecimals(double fileSizeInMB, String format) {
-        DecimalFormat df = new DecimalFormat(format);
-        return df.format(fileSizeInMB);
+        });
     }
 
     private String removePathFromName(String filename) {
@@ -107,12 +82,18 @@ public class DownloadedMediaAdapter extends
         private final ImageView icon;
         private final CustomTextView fileName;
         private final CustomTextView size;
+        private final View container;
 
         public MediaViewHolder(View itemView) {
             super(itemView);
             icon = (ImageView) itemView.findViewById(R.id.icon);
             fileName = (CustomTextView) itemView.findViewById(R.id.filename);
             size = (CustomTextView) itemView.findViewById(R.id.size);
+            container = itemView;
         }
+    }
+
+    public void setOnItemClickListener(AdapterView.OnItemClickListener onItemClickListener) {
+        mOnItemClickListener = onItemClickListener;
     }
 }

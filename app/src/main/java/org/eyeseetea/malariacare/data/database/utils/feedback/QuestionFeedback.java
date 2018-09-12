@@ -20,10 +20,10 @@
 package org.eyeseetea.malariacare.data.database.utils.feedback;
 
 import org.eyeseetea.malariacare.R;
-import org.eyeseetea.malariacare.data.database.model.Media;
-import org.eyeseetea.malariacare.data.database.model.Option;
-import org.eyeseetea.malariacare.data.database.model.Question;
-import org.eyeseetea.malariacare.data.database.model.Value;
+import org.eyeseetea.malariacare.data.database.model.MediaDB;
+import org.eyeseetea.malariacare.data.database.model.OptionDB;
+import org.eyeseetea.malariacare.data.database.model.QuestionDB;
+import org.eyeseetea.malariacare.data.database.model.ValueDB;
 import org.eyeseetea.malariacare.utils.Constants;
 
 import java.util.List;
@@ -36,28 +36,37 @@ public class QuestionFeedback implements Feedback {
     /**
      * Question referred by this feedback
      */
-    private Question question;
+    private QuestionDB question;
 
     /**
      * Value associated to question in the current survey
      */
-    private Value value;
+    private ValueDB value;
 
     /**
      * Cached media to enhance listview performance
      */
-    private List<Media> media;
+    private List<MediaDB> media;
 
     /**
      * Flag that indicates if this element has its feedback open or not
      */
+    private boolean isShown;
+    /**
+     * Flag that indicates if this element has its feedback open or not
+     */
     private boolean feedbackShown;
+    /**
+     * Default value to decide if the question is shown or hidden.
+     */
+    private boolean defaultVisibility=false;
 
-    public QuestionFeedback(Question question, Value value) {
+    public QuestionFeedback(QuestionDB question, ValueDB value) {
         this.question = question;
         this.value = value;
         this.feedbackShown = false;
         this.media = null;
+        this.setShown(defaultVisibility);
     }
 
     @Override
@@ -70,23 +79,29 @@ public class QuestionFeedback implements Feedback {
         if (this.value == null || this.value.getConflict()) {
             return false;
         }
-        Option option = this.value.getOption();
+        OptionDB option = this.value.getOption();
         if (option == null) {
             return false;
         }
         return option.getFactor() == 1;
     }
 
-    public Question getQuestion() {
+    @Override
+    public boolean hasMedia() {
+        return getMedia().size()>0;
+    }
+
+
+    public QuestionDB getQuestion() {
         return this.question;
     }
 
-    public List<Media> getMedia() {
+    public List<MediaDB> getMedia() {
 
         //First time getting media
         if (media == null) {
             //no media attached
-            media = Media.findByQuestion(question);
+            media = MediaDB.findByQuestion(question);
         }
 
         //No media (checked before) | real image/video media
@@ -116,6 +131,23 @@ public class QuestionFeedback implements Feedback {
     public boolean toggleFeedbackShown() {
         this.feedbackShown = !this.feedbackShown;
         return this.feedbackShown;
+    }
+    /**
+     * Returns if this row has its feedback open or not
+     *
+     * @return
+     */
+    public boolean isShown() {
+        return this.isShown;
+    }
+    /**
+     * Toggles the question shown flag
+     *
+     * @return return the new assigned value
+     */
+    public boolean toggleShown() {
+        this.isShown = !this.isShown;
+        return this.isShown;
     }
 
     /**
@@ -177,7 +209,7 @@ public class QuestionFeedback implements Feedback {
     public int getColor() {
         int textColor;
         if (this.getOption() == null || this.getOption().isEmpty()) {
-            textColor = R.color.amber;
+            textColor = R.color.na_text_color;
         } else {
             textColor = (this.isPassed() && value != null && !this.value.getConflict()) ? R.color.green : R.color.red;
         }
@@ -209,5 +241,9 @@ public class QuestionFeedback implements Feedback {
     @Override
     public int hashCode() {
         return this.question.hashCode();
+    }
+
+    public void setShown(boolean shown) {
+        isShown = shown;
     }
 }

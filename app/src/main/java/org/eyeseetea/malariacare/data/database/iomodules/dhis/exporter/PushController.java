@@ -24,10 +24,10 @@ import android.util.Log;
 
 import org.eyeseetea.malariacare.data.IDataSourceCallback;
 import org.eyeseetea.malariacare.data.database.iomodules.dhis.importer.models.EventExtended;
-import org.eyeseetea.malariacare.data.database.model.ObsActionPlan;
-import org.eyeseetea.malariacare.data.database.model.Survey;
+import org.eyeseetea.malariacare.data.database.model.ObsActionPlanDB;
+import org.eyeseetea.malariacare.data.database.model.SurveyDB;
 import org.eyeseetea.malariacare.data.database.utils.PreferencesState;
-import org.eyeseetea.malariacare.data.remote.PushDhisSDKDataSource;
+import org.eyeseetea.malariacare.data.remote.sdk.PushDhisSDKDataSource;
 import org.eyeseetea.malariacare.domain.boundary.IPushController;
 import org.eyeseetea.malariacare.domain.entity.pushsummary.PushReport;
 import org.eyeseetea.malariacare.domain.exception.ConversionException;
@@ -66,10 +66,10 @@ public class PushController implements IPushController {
 
             Log.d(TAG, "Network connected");
 
-            List<Survey> surveys = Survey.getAllCompletedSurveys();
+            List<SurveyDB> surveys = SurveyDB.getAllCompletedSurveys();
 
             if (surveys == null || surveys.size() == 0) {
-                pushObsActionPlan(callback);
+                obsActionPlanPush(callback);
             } else {
 
                 mPushDhisSDKDataSource.wipeEvents();
@@ -94,13 +94,14 @@ public class PushController implements IPushController {
         }
     }
 
-    private void pushObsActionPlan(IPushControllerCallback callback) {
-        List<ObsActionPlan> obsActionPlan =
-                ObsActionPlan.getAllCompletedObsActionPlansInSentSurveys();
+    private void obsActionPlanPush(IPushControllerCallback callback) {
+        List<ObsActionPlanDB> obsActionPlan =
+                ObsActionPlanDB.getAllCompletedObsActionPlansInSentSurveys();
 
         if (obsActionPlan == null || obsActionPlan.size() == 0) {
             callback.onError(new SurveysToPushNotFoundException("Null surveys"));
         } else {
+
             mPushDhisSDKDataSource.wipeEvents();
             Log.d(TAG, "convert surveys to sdk");
 
@@ -144,7 +145,7 @@ public class PushController implements IPushController {
                         }
                         try {
                             mConvertToSDKVisitor.saveSurveyStatus(mapEventsReports, callback, kind);
-                            callback.onComplete();
+                            callback.onComplete(kind);
                         }catch (Exception e){
                             onError(new PushReportException(e));
                         }
@@ -161,17 +162,17 @@ public class PushController implements IPushController {
                 }, kind);
     }
 
-    private void convertToSDK(List<Survey> surveys) throws ConversionException{
+    private void convertToSDK(List<SurveyDB> surveys) throws ConversionException{
         Log.d(TAG, "Converting APP survey into a SDK event");
-        for (Survey survey : surveys) {
+        for (SurveyDB survey : surveys) {
             survey.setStatus(Constants.SURVEY_SENDING);
             survey.save();
             survey.accept(mConvertToSDKVisitor);
         }
     }
-    private void convertObsToSDK(List<ObsActionPlan> obsActionPlanList) throws ConversionException{
+    private void convertObsToSDK(List<ObsActionPlanDB> obsActionPlanList) throws ConversionException{
         Log.d(TAG, "Converting APP survey into a SDK event");
-        for (ObsActionPlan obsActionPlan : obsActionPlanList) {
+        for (ObsActionPlanDB obsActionPlan : obsActionPlanList) {
             obsActionPlan.setStatus(Constants.SURVEY_SENDING);
             obsActionPlan.save();
             obsActionPlan.accept(mConvertToSDKVisitor);

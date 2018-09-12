@@ -33,15 +33,18 @@ import android.util.Log;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
+import android.widget.ImageButton;
 import android.widget.ListView;
 import android.widget.ProgressBar;
 import android.widget.RelativeLayout;
 
 import org.eyeseetea.malariacare.DashboardActivity;
 import org.eyeseetea.malariacare.R;
-import org.eyeseetea.malariacare.data.database.model.Survey;
+import org.eyeseetea.malariacare.data.database.model.SurveyDB;
 import org.eyeseetea.malariacare.data.database.utils.Session;
 import org.eyeseetea.malariacare.data.database.utils.feedback.Feedback;
+import org.eyeseetea.malariacare.fragments.strategies.AFeedbackFragmentStrategy;
+import org.eyeseetea.malariacare.fragments.strategies.FeedbackFragmentStrategy;
 import org.eyeseetea.malariacare.layout.adapters.survey.FeedbackAdapter;
 import org.eyeseetea.malariacare.layout.utils.LayoutUtils;
 import org.eyeseetea.malariacare.services.SurveyService;
@@ -68,12 +71,17 @@ public class FeedbackFragment extends Fragment implements IModuleFragment {
     /**
      * Progress dialog shown while loading
      */
-    private ProgressBar progressBar;
+    private RelativeLayout progressBarContainer;
 
     /**
      * Checkbox that toggle between all|failed questions
      */
     private CustomRadioButton chkFailed;
+
+    /**
+     * Checkbox that toggle between all|containing media questions
+     */
+    private CustomRadioButton chkMedia;
     /**
      * planAction that toggle between all|failed questions
      */
@@ -97,12 +105,15 @@ public class FeedbackFragment extends Fragment implements IModuleFragment {
      */
     RelativeLayout llLayout;
 
+    AFeedbackFragmentStrategy mFeedbackFragmentStrategy;
+
     @Override
     public View onCreateView(LayoutInflater inflater, ViewGroup container,
             Bundle savedInstanceState) {
         FragmentActivity faActivity = (FragmentActivity) super.getActivity();
         // Replace LinearLayout by the type of the root element of the layout you're trying to load
         llLayout = (RelativeLayout) inflater.inflate(R.layout.feedback, container, false);
+        mFeedbackFragmentStrategy = new FeedbackFragmentStrategy();
         prepareUI(moduleName);
         //Starts the background service only one time
         startProgress();
@@ -155,13 +166,15 @@ public class FeedbackFragment extends Fragment implements IModuleFragment {
      */
     private void prepareUI(String module) {
         //Get progress
-        progressBar = (ProgressBar) llLayout.findViewById(R.id.survey_progress);
+        progressBarContainer = (RelativeLayout) llLayout.findViewById(R.id.survey_progress_container);
 
         //Set adapter and list
         feedbackAdapter = new FeedbackAdapter(getActivity(),
                 Session.getSurveyByModule(module).getId_survey(), module);
         feedbackListView = (ListView) llLayout.findViewById(R.id.feedbackListView);
         feedbackListView.setAdapter(feedbackAdapter);
+        feedbackListView.setDivider(null);
+        feedbackListView.setDividerHeight(0);
 
         //And checkbox listener
         chkFailed = (CustomRadioButton) llLayout.findViewById(R.id.chkFailed);
@@ -175,6 +188,17 @@ public class FeedbackFragment extends Fragment implements IModuleFragment {
                                          }
                                      }
         );
+        chkMedia = (CustomRadioButton) llLayout.findViewById(R.id.chkMedia);
+        chkMedia.setChecked(false);
+        chkMedia.setOnClickListener(new View.OnClickListener() {
+                                         @Override
+                                         public void onClick(View v) {
+                                             feedbackAdapter.toggleOnlyMedia();
+                                             ((CustomRadioButton) v).setChecked(feedbackAdapter
+                                                     .isOnlyMedia());
+                                         }
+                                     }
+        );
         planAction = (CustomButton) llLayout.findViewById(R.id.action_plan);
         planAction.setOnClickListener(new View.OnClickListener() {
                                          @Override
@@ -183,7 +207,7 @@ public class FeedbackFragment extends Fragment implements IModuleFragment {
                                          }
                                      }
         );
-        CustomRadioButton goback = (CustomRadioButton) llLayout.findViewById(
+        ImageButton goback = (ImageButton) llLayout.findViewById(
                 R.id.backToSentSurveys);
         goback.setOnClickListener(new View.OnClickListener() {
                                       @Override
@@ -194,19 +218,19 @@ public class FeedbackFragment extends Fragment implements IModuleFragment {
         );
 
         //Set mainscore and color.
-        Survey survey = Session.getSurveyByModule(module);
+        SurveyDB survey = Session.getSurveyByModule(module);
         if (survey.hasMainScore()) {
             float average = survey.getMainScore();
             CustomTextView item = (CustomTextView) llLayout.findViewById(R.id.feedback_total_score);
             item.setText(String.format("%.1f%%", average));
             int colorId = LayoutUtils.trafficColor(average);
-            item.setTextColor(getResources().getColor(colorId));
+            mFeedbackFragmentStrategy.setTotalPercentColor(item, colorId, getActivity());
         } else {
             CustomTextView item = (CustomTextView) llLayout.findViewById(R.id.feedback_total_score);
             item.setText(String.format("NaN"));
             float average = 0;
             int colorId = LayoutUtils.trafficColor(average);
-            item.setTextColor(getResources().getColor(colorId));
+            mFeedbackFragmentStrategy.setTotalPercentColor(item, colorId, getActivity());
         }
     }
 
@@ -219,7 +243,7 @@ public class FeedbackFragment extends Fragment implements IModuleFragment {
      * Stops progress view and shows real data
      */
     private void stopProgress() {
-        this.progressBar.setVisibility(View.GONE);
+        this.progressBarContainer.setVisibility(View.GONE);
         this.feedbackListView.setVisibility(View.VISIBLE);
     }
 
@@ -228,8 +252,7 @@ public class FeedbackFragment extends Fragment implements IModuleFragment {
      */
     private void startProgress() {
         this.feedbackListView.setVisibility(View.GONE);
-        this.progressBar.setVisibility(View.VISIBLE);
-        this.progressBar.setEnabled(true);
+        this.progressBarContainer.setVisibility(View.VISIBLE);
     }
 
     /**
@@ -293,9 +316,11 @@ public class FeedbackFragment extends Fragment implements IModuleFragment {
         @Override
         public void onReceive(Context context, Intent intent) {
             Log.d(TAG, "onReceive");
-            List<Feedback> feedbackList = (List<Feedback>) Session.popServiceValue(
-                    PREPARE_FEEDBACK_ACTION_ITEMS);
-            loadItems(feedbackList);
+            if (SurveyService.PREPARE_FEEDBACK_ACTION.equals(intent.getAction())) {
+                List<Feedback> feedbackList = (List<Feedback>) Session.popServiceValue(
+                        PREPARE_FEEDBACK_ACTION_ITEMS);
+                loadItems(feedbackList);
+            }
         }
     }
 

@@ -23,6 +23,12 @@
     android:layout_width="match_parent"
     android:layout_height="match_parent"
     android:orientation="vertical">
+
+    <org.eyeseetea.malariacare.views.filters.OrgUnitProgramFilterView
+        android:id="@+id/monitor_org_unit_program_filter_view"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content" />
+
     <FrameLayout
         android:orientation="vertical"
         android:layout_width="fill_parent"
@@ -37,12 +43,13 @@
             android:focusable="true"
             >
         </WebView>
+
         <TextView
             android:id="@+id/monitor_no_surveys_message"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:text="@string/monitor_no_surveys_to_show"
             android:layout_gravity="center"
-            android:visibility="gone"/>
+            android:text="@string/monitor_no_surveys_to_show"
+            android:visibility="gone" />
     </FrameLayout>
 </LinearLayout>

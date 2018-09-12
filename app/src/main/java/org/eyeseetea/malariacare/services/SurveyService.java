@@ -24,30 +24,24 @@ import android.content.Intent;
 import android.support.v4.content.LocalBroadcastManager;
 import android.util.Log;
 
-import com.raizlabs.android.dbflow.sql.language.Select;
-
-import org.eyeseetea.malariacare.data.database.model.CompositeScore;
-import org.eyeseetea.malariacare.data.database.model.OrgUnit;
-import org.eyeseetea.malariacare.data.database.model.OrgUnitLevel;
-import org.eyeseetea.malariacare.data.database.model.Program;
-import org.eyeseetea.malariacare.data.database.model.Survey;
-import org.eyeseetea.malariacare.data.database.model.Tab;
-import org.eyeseetea.malariacare.data.database.model.Tab_Table;
+import org.eyeseetea.malariacare.data.database.model.CompositeScoreDB;
+import org.eyeseetea.malariacare.data.database.model.OrgUnitDB;
+import org.eyeseetea.malariacare.data.database.model.OrgUnitLevelDB;
+import org.eyeseetea.malariacare.data.database.model.ProgramDB;
+import org.eyeseetea.malariacare.data.database.model.SurveyDB;
+import org.eyeseetea.malariacare.data.database.model.TabDB;
 import org.eyeseetea.malariacare.data.database.utils.PreferencesState;
 import org.eyeseetea.malariacare.data.database.utils.Session;
 import org.eyeseetea.malariacare.data.database.utils.feedback.Feedback;
 import org.eyeseetea.malariacare.data.database.utils.feedback.FeedbackBuilder;
-import org.eyeseetea.malariacare.data.database.utils.planning.PlannedItemBuilder;
 import org.eyeseetea.malariacare.data.database.utils.services.BaseServiceBundle;
-import org.eyeseetea.malariacare.data.database.utils.services.PlannedServiceBundle;
-import org.eyeseetea.malariacare.domain.entity.SurveyAnsweredRatio;
-import org.eyeseetea.malariacare.domain.usecase.GetSurveyAnsweredRatioUseCase;
 import org.eyeseetea.malariacare.layout.score.ScoreRegister;
 import org.eyeseetea.malariacare.utils.AUtils;
 import org.eyeseetea.malariacare.utils.Constants;
 
 import java.util.ArrayList;
 import java.util.Calendar;
+import java.util.Date;
 import java.util.List;
 
 /**
@@ -60,16 +54,6 @@ public class SurveyService extends IntentService {
      * Constant added to the intent in order to reuse the service for different 'methods'
      */
     public static final String SERVICE_METHOD="serviceMethod";
-
-    /**
-     * Name of the parameter that holds every survey that goes into the planned tab
-     */
-    public static final String PLANNED_SURVEYS_ACTION="org.eyeseetea.malariacare.services.SurveyService.PLANNED_SURVEYS_ACTION";
-
-    /**
-     * Name of the parameter that holds every survey that goes into the planned tab
-     */
-    public static final String PLANNED_ORG_UNIT_SURVEYS_ACTION="org.eyeseetea.malariacare.services.SurveyService.PLANNED_ORG_UNIT_SURVEYS_ACTION";
     /**
      * Name of the parameter that holds every survey and filters that goes into the feedback
      */
@@ -174,12 +158,6 @@ public class SurveyService extends IntentService {
             case ALL_COMPLETED_SURVEYS_ACTION:
                 getAllCompletedSurveys();
                 break;
-            case PLANNED_SURVEYS_ACTION:
-                reloadPlannedSurveys();
-                break;
-            case PLANNED_ORG_UNIT_SURVEYS_ACTION:
-                reloadOrgUnitPlannedSurveys();
-                break;
             case RELOAD_DASHBOARD_ACTION:
                 reloadDashboard();
                 break;
@@ -210,15 +188,15 @@ public class SurveyService extends IntentService {
         Log.d(TAG,"getAllSentCompletedOrConflictSurveys (Thread:"+Thread.currentThread().getId()+")");
 
         //Select surveys from sql
-        List<Survey> sentSurveyList;
+        List<SurveyDB> sentSurveyList;
         if(PreferencesState.getInstance().isLastForOrgUnit()) {
-            sentSurveyList = Survey.getLastSentCompletedOrConflictSurveys();
+            sentSurveyList = SurveyDB.getLastSentCompletedOrConflictSurveys();
         }else{
-            sentSurveyList = Survey.getAllSentCompletedOrConflictSurveys();
+            sentSurveyList = SurveyDB.getAllSentCompletedOrConflictSurveys();
         }
-        sentDashboardBundle.addModelList(Survey.class.getName(),sentSurveyList);
-        sentDashboardBundle.addModelList(OrgUnit.class.getName(),OrgUnit.getAllOrgUnit());
-        sentDashboardBundle.addModelList(Program.class.getName(),Program.getAllPrograms());
+        sentDashboardBundle.addModelList(SurveyDB.class.getName(),sentSurveyList);
+        sentDashboardBundle.addModelList(OrgUnitDB.class.getName(),OrgUnitDB.getAllOrgUnit());
+        sentDashboardBundle.addModelList(ProgramDB.class.getName(),ProgramDB.getAllPrograms());
 
         //Since intents does NOT admit NON serializable as values we use Session instead
         Session.putServiceValue(RELOAD_SENT_FRAGMENT_ACTION, sentDashboardBundle);
@@ -234,12 +212,12 @@ public class SurveyService extends IntentService {
         Log.d(TAG,"getAllSentCompletedOrConflictSurveys (Thread:"+Thread.currentThread().getId()+")");
 
         //Select surveys from sql
-        List<Survey> sentSurveyList;
+        List<SurveyDB> sentSurveyList;
 
-        sentSurveyList = Survey.getLastSentCompletedOrConflictSurveys();
-        sentDashboardBundle.addModelList(Survey.class.getName(),sentSurveyList);
-        sentDashboardBundle.addModelList(OrgUnit.class.getName(),OrgUnit.getAllOrgUnit());
-        sentDashboardBundle.addModelList(Program.class.getName(),Program.getAllPrograms());
+        sentSurveyList = SurveyDB.getLastSentCompletedOrConflictSurveys();
+        sentDashboardBundle.addModelList(SurveyDB.class.getName(),sentSurveyList);
+        sentDashboardBundle.addModelList(OrgUnitDB.class.getName(),OrgUnitDB.getAllOrgUnit());
+        sentDashboardBundle.addModelList(ProgramDB.class.getName(),ProgramDB.getAllPrograms());
 
         //Since intents does NOT admit NON serializable as values we use Session instead
         Session.putServiceValue(RELOAD_SENT_FRAGMENT_ACTION, sentDashboardBundle);
@@ -250,35 +228,28 @@ public class SurveyService extends IntentService {
 
     }
 
-    private void reloadOrgUnitPlannedSurveys() {
-        Log.d(TAG, "reloadPlanningSurveys");
-        PlannedServiceBundle plannedServiceBundle = new PlannedServiceBundle();
-        plannedServiceBundle.setPlannedItems(PlannedItemBuilder.getInstance().buildPlannedItems());
-        plannedServiceBundle.addModelList(OrgUnit.class.getName(),OrgUnit.getAllOrgUnit());
-        plannedServiceBundle.addModelList(Program.class.getName(),Program.getAllPrograms());
-        Session.putServiceValue(PLANNED_ORG_UNIT_SURVEYS_ACTION, plannedServiceBundle);
-        //Returning result to anyone listening
-        LocalBroadcastManager.getInstance(this).sendBroadcast(new Intent(PLANNED_ORG_UNIT_SURVEYS_ACTION));
-    }
-
     private void reloadPlannedSurveys() {
-        Log.d(TAG, "reloadPlanningSurveys");
-        PlannedServiceBundle plannedServiceBundle = new PlannedServiceBundle();
-        plannedServiceBundle.setPlannedItems(PlannedItemBuilder.getInstance().buildPlannedItems());
-        plannedServiceBundle.addModelList(OrgUnit.class.getName(),OrgUnit.getAllOrgUnit());
-        plannedServiceBundle.addModelList(Program.class.getName(),Program.getAllPrograms());
-        Session.putServiceValue(PLANNED_SURVEYS_ACTION, plannedServiceBundle);
-        //Returning result to anyone listening
-        LocalBroadcastManager.getInstance(this).sendBroadcast(new Intent(PLANNED_SURVEYS_ACTION));
+        Intent surveysIntent = new Intent(
+                PreferencesState.getInstance().getContext().getApplicationContext(),
+                PlannedSurveyService.class);
+        surveysIntent.putExtra(PlannedSurveyService.SERVICE_METHOD,
+                PlannedSurveyService.PLANNED_SURVEYS_ACTION);
+        PreferencesState.getInstance().getContext().getApplicationContext().startService(surveysIntent);
+        surveysIntent = new Intent(
+                PreferencesState.getInstance().getContext().getApplicationContext(),
+                PlannedSurveyService.class);
+        surveysIntent.putExtra(PlannedSurveyService.SERVICE_METHOD,
+                PlannedSurveyService.PLANNED_PER_ORG_UNIT_SURVEYS_ACTION);
+        PreferencesState.getInstance().getContext().getApplicationContext().startService(surveysIntent);
     }
 
     private void getAllCreateSurveyData() {
         Log.d(TAG,"getAllCreateSurveyData (Thread:"+Thread.currentThread().getId()+")");
 
         BaseServiceBundle orgCreateSurveyData=new BaseServiceBundle();
-        orgCreateSurveyData.addModelList(OrgUnit.class.getName(),OrgUnit.list());
-        orgCreateSurveyData.addModelList(OrgUnitLevel.class.getName(),OrgUnitLevel.list());
-        orgCreateSurveyData.addModelList(Program.class.getName(),Program.list());
+        orgCreateSurveyData.addModelList(OrgUnitDB.class.getName(), OrgUnitDB.list());
+        orgCreateSurveyData.addModelList(OrgUnitLevelDB.class.getName(), OrgUnitLevelDB.list());
+        orgCreateSurveyData.addModelList(ProgramDB.class.getName(), ProgramDB.list());
 
         //Since intents does NOT admit NON serializable as values we use Session instead
         Session.putServiceValue(ALL_CREATE_SURVEY_DATA_ACTION, orgCreateSurveyData);
@@ -290,17 +261,20 @@ public class SurveyService extends IntentService {
 
     private void getAllMonitorData() {
         Log.d(TAG,"getAllMonitorData (Thread:"+Thread.currentThread().getId()+")");
-        List<Program> programList=Program.getAllPrograms();
+        List<ProgramDB> programList= ProgramDB.getAllPrograms();
+        Date date = new Date();
         Calendar cal = Calendar.getInstance();
-        cal.add(Calendar.MONTH, -6);
-        List<Survey> sentSurveys = Survey.getAllSentCompletedOrConflictSurveysAfterDate(
+        cal.setTime(date);
+        cal.add(Calendar.MONTH, -5);
+        cal.set(Calendar.DAY_OF_MONTH, 1);
+        List<SurveyDB> sentSurveys = SurveyDB.getAllSentCompletedOrConflictSurveysAfterDate(
                 cal.getTime());
-        List<OrgUnit> orgUnits=OrgUnit.list();
+        List<OrgUnitDB> orgUnits= OrgUnitDB.list();
 
         BaseServiceBundle monitorMap=new BaseServiceBundle();
-        monitorMap.addModelList(Survey.class.getName(),sentSurveys);
-        monitorMap.addModelList(Program.class.getName(),programList);
-        monitorMap.addModelList(OrgUnit.class.getName(),orgUnits);
+        monitorMap.addModelList(SurveyDB.class.getName(),sentSurveys);
+        monitorMap.addModelList(ProgramDB.class.getName(),programList);
+        monitorMap.addModelList(OrgUnitDB.class.getName(),orgUnits);
         //Since intents does NOT admit NON serializable as values we use Session instead
         Session.putServiceValue(ALL_MONITOR_DATA_ACTION, monitorMap);
 
@@ -311,7 +285,7 @@ public class SurveyService extends IntentService {
 
     private void getAllPrograms() {
         Log.d(TAG,"getAllPrograms (Thread:"+Thread.currentThread().getId()+")");
-        List<Program> programList=Program.getAllPrograms();
+        List<ProgramDB> programList= ProgramDB.getAllPrograms();
         //Since intents does NOT admit NON serializable as values we use Session instead
         Session.putServiceValue(ALL_PROGRAMS_ACTION, programList);
 
@@ -324,25 +298,7 @@ public class SurveyService extends IntentService {
         Log.d(TAG,"getAllUncompletedUnsentUnplanedSurveys (Thread:"+Thread.currentThread().getId()+")");
 
         //Select surveys from sql
-        List<Survey> surveys = Survey.getAllInProgressSurveys();
-
-        //Load %completion in every survey (it takes a while so it can NOT be done in UI Thread)
-        for(Survey survey:surveys){
-            GetSurveyAnsweredRatioUseCase getSurveyAnsweredRatioUseCase = new GetSurveyAnsweredRatioUseCase();
-            getSurveyAnsweredRatioUseCase.execute(survey.getId_survey(),
-                    GetSurveyAnsweredRatioUseCase.RecoveryFrom.MEMORY_FIRST,
-                    new GetSurveyAnsweredRatioUseCase.Callback() {
-                        @Override
-                        public void nextProgressMessage() {
-                            Log.d(getClass().getName(), "nextProgressMessage");
-                        }
-
-                        @Override
-                        public void onComplete(SurveyAnsweredRatio surveyAnsweredRatio) {
-                            Log.d(getClass().getName(), "onComplete");
-                        }
-                    });
-        }
+        List<SurveyDB> surveys = SurveyDB.getAllInProgressSurveys();
 
         //Since intents does NOT admit NON serializable as values we use Session instead
         Session.putServiceValue(ALL_IN_PROGRESS_SURVEYS_ACTION,surveys);
@@ -353,7 +309,7 @@ public class SurveyService extends IntentService {
     }
 
     private void preLoadTabItems(Long tabID, String module){
-        Tab tab = Tab.findById(tabID);
+        TabDB tab = TabDB.findById(tabID);
         if (tab !=null) {
             AUtils.preloadTabItems(tab, module);
         }
@@ -361,13 +317,13 @@ public class SurveyService extends IntentService {
 
     private void reloadDashboard(){
         Log.d(TAG, "reloadDashboard");
+        reloadPlannedSurveys();
         reloadSentFragment();
         getAllCompletedSurveys();
         getAllCreateSurveyData();
         getAllInProgressSurveys();
         getAllMonitorData();
         getAllPrograms();
-        reloadPlannedSurveys();
     }
 
     /**
@@ -391,25 +347,7 @@ public class SurveyService extends IntentService {
         Log.d(TAG,"getCompletedSurveys (Thread:"+Thread.currentThread().getId()+")");
 
         //Select surveys from sql
-        List<Survey> surveys = Survey.getAllCompletedSurveys();
-
-        //Load %completion in every survey (it takes a while so it can NOT be done in UI Thread)
-        for(Survey survey:surveys){
-            GetSurveyAnsweredRatioUseCase getSurveyAnsweredRatioUseCase = new GetSurveyAnsweredRatioUseCase();
-            getSurveyAnsweredRatioUseCase.execute(survey.getId_survey(),
-                    GetSurveyAnsweredRatioUseCase.RecoveryFrom.MEMORY_FIRST,
-                    new GetSurveyAnsweredRatioUseCase.Callback() {
-                        @Override
-                        public void nextProgressMessage() {
-                            Log.d(getClass().getName(), "nextProgressMessage");
-                        }
-
-                        @Override
-                        public void onComplete(SurveyAnsweredRatio surveyAnsweredRatio) {
-                            Log.d(getClass().getName(), "onComplete");
-                        }
-                    });
-        }
+        List<SurveyDB> surveys = SurveyDB.getAllCompletedSurveys();
 
         //Since intents does NOT admit NON serializable as values we use Session instead
         Session.putServiceValue(ALL_COMPLETED_SURVEYS_ACTION,surveys);
@@ -427,14 +365,14 @@ public class SurveyService extends IntentService {
         Log.d(TAG, "prepareSurveyInfo (Thread:" + Thread.currentThread().getId() + ")");
 
         //register composite scores for current survey and module
-        List<CompositeScore> compositeScores = CompositeScore.list();
-        Survey survey = Session.getSurveyByModule(module);
+        List<CompositeScoreDB> compositeScores = CompositeScoreDB.list();
+        SurveyDB survey = Session.getSurveyByModule(module);
         ScoreRegister.registerCompositeScores(compositeScores,survey.getId_survey(),module);
 
         //Get tabs for current program & register them (scores)
-        List<Tab> tabs = Tab.getTabsBySession(module);
+        List<TabDB> tabs = TabDB.getTabsBySession(module);
         //old List<Tab> allTabs = new Select().all().from(Tab.class).where(Condition.column(Tab$Table.ID_PROGRAM).eq(survey.getProgram().getId_program())).queryList();
-        List<Tab> allTabs = new Select().from(Tab.class).where(Tab_Table.id_program_fk.eq(survey.getProgram().getId_program())).queryList();
+        List<TabDB> allTabs = TabDB.getAllTabsByProgram(survey.getProgram().getId_program());
         //register tabs scores for current survey and module
         ScoreRegister.registerTabScores(tabs, survey.getId_survey(), module);
 

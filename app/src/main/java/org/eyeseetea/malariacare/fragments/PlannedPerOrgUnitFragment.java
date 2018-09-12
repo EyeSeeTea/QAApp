@@ -25,19 +25,16 @@ import android.content.Context;
 import android.content.Intent;
 import android.content.IntentFilter;
 import android.os.Bundle;
-import android.support.v4.content.ContextCompat;
 import android.support.v4.content.LocalBroadcastManager;
 import android.util.Log;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
-import android.widget.BaseAdapter;
-import android.widget.Button;
 import android.widget.CompoundButton;
-import android.widget.ListView;
+import android.widget.ImageButton;
 
 import org.eyeseetea.malariacare.R;
-import org.eyeseetea.malariacare.data.database.model.Survey;
+import org.eyeseetea.malariacare.data.database.model.SurveyDB;
 import org.eyeseetea.malariacare.data.database.utils.PreferencesState;
 import org.eyeseetea.malariacare.data.database.utils.Session;
 import org.eyeseetea.malariacare.data.database.utils.planning.PlannedItem;
@@ -45,10 +42,10 @@ import org.eyeseetea.malariacare.data.database.utils.planning.PlannedSurvey;
 import org.eyeseetea.malariacare.data.database.utils.planning.PlannedSurveyByOrgUnit;
 import org.eyeseetea.malariacare.data.database.utils.planning.ScheduleListener;
 import org.eyeseetea.malariacare.data.database.utils.services.PlannedServiceBundle;
-import org.eyeseetea.malariacare.layout.adapters.dashboard.IDashboardAdapter;
 import org.eyeseetea.malariacare.layout.adapters.dashboard.PlanningPerOrgUnitAdapter;
-import org.eyeseetea.malariacare.services.SurveyService;
+import org.eyeseetea.malariacare.services.PlannedSurveyService;
 import org.eyeseetea.malariacare.views.CustomCheckBox;
+import org.eyeseetea.malariacare.views.filters.OrgUnitProgramFilterView;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -59,12 +56,19 @@ import java.util.List;
 public class PlannedPerOrgUnitFragment extends ListFragment {
     public static final String TAG = ".PlannedOrgUnitsF";
 
+    public interface Callback {
+        void onItemCheckboxChanged();
+    }
+
     private PlannedItemsReceiver plannedItemsReceiver;
-    protected IDashboardAdapter adapter;
+    protected PlanningPerOrgUnitAdapter adapter;
     private static List<PlannedSurveyByOrgUnit> plannedSurveys;
-    static Button scheduleButton;
+    static ImageButton scheduleButton;
     CustomCheckBox selectAllCheckbox;
     String filterOrgUnitUid;
+
+    OrgUnitProgramFilterView orgUnitProgramFilterView;
+
     public PlannedPerOrgUnitFragment() {
 
     }
@@ -75,10 +79,6 @@ public class PlannedPerOrgUnitFragment extends ListFragment {
         Log.d(TAG, "onCreate");
         super.onCreate(savedInstanceState);
         PreferencesState.getInstance().initalizateActivityDependencies();
-
-        //get the org unit uid from dashboardactivity
-        //filterOrgUnitUid=getActivity().getIntent().getExtras().getString(getActivity().getApplicationContext().getResources().getString(R.string.organisation_unit));
-        this.adapter = Session.getAdapterSent();
         this.plannedSurveys = new ArrayList();
     }
 
@@ -88,13 +88,18 @@ public class PlannedPerOrgUnitFragment extends ListFragment {
         if (container == null) {
             return null;
         }
-
-        return super.onCreateView(inflater, container, savedInstanceState);
+        return inflater.inflate(R.layout.plan_per_org_unit_listview, null);
     }
+
 
     @Override
     public void onActivityCreated(Bundle savedInstanceState) {
         Log.d(TAG, "onActivityCreated");
+
+        orgUnitProgramFilterView = (OrgUnitProgramFilterView) getActivity()
+                .findViewById(R.id.plan_org_unit_program_filter_view);
+        scheduleButton = (ImageButton) getActivity().findViewById(R.id.reschedule_button);
+        selectAllCheckbox=(CustomCheckBox) getActivity().findViewById(R.id.select_all_orgunits);
         super.onActivityCreated(savedInstanceState);
 
     }
@@ -114,7 +119,6 @@ public class PlannedPerOrgUnitFragment extends ListFragment {
         initAdapter(plannedItems);
         initScheduleButton();
         initListView();
-        setListShown(true);
         //checks the allSelect checkbox looking the reloaded surveys.
         if(plannedItems.size()==countOfCheckedSurveys){
             setSelectAllCheckboxAs(true,false);
@@ -123,6 +127,23 @@ public class PlannedPerOrgUnitFragment extends ListFragment {
             setSelectAllCheckboxAs(false,false);
         }
         resetList();
+    }
+
+    private void refreshMenuDots() {
+        List<PlannedSurveyByOrgUnit> plannedSurveys = ( List<PlannedSurveyByOrgUnit> ) adapter.items;
+        int countOfPlannedSurveys = 0;
+        for (PlannedSurveyByOrgUnit plannedSurveyByOrgUnit : plannedSurveys){
+            if(plannedSurveyByOrgUnit.getChecked()){
+                countOfPlannedSurveys++;
+            }
+        }
+        for(PlannedSurveyByOrgUnit plannedSurveyByOrgUnit:plannedSurveys){
+            if(countOfPlannedSurveys>=2) {
+                plannedSurveyByOrgUnit.setHideMenu(true);
+            }else{
+                plannedSurveyByOrgUnit.setHideMenu(false);
+            }
+        }
     }
 
     private void reCheckCheckboxes(PlannedSurveyByOrgUnit newPlannedSurveys) {
@@ -138,21 +159,16 @@ public class PlannedPerOrgUnitFragment extends ListFragment {
         selectAllCheckbox.post(new Runnable() {
             @Override
             public void run() {
-                if (getView() != null) {
-                    CustomCheckBox selectAllCheckbox = (CustomCheckBox) getView().findViewById(
-                            R.id.select_all_orgunits);
-                    selectAllCheckbox.setChecked(value, isClicked);
-                }
+                selectAllCheckbox.setChecked(value,isClicked);
             }
         });
     }
 
     private void initScheduleButton() {
-        scheduleButton = (Button) getActivity().findViewById(R.id.reschedule_button);
         scheduleButton.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View v) {
-                List<Survey> scheduleSurveys=new ArrayList<>();
+                List<SurveyDB> scheduleSurveys=new ArrayList<>();
                 for(PlannedSurveyByOrgUnit plannedSurveyByOrgUnit:plannedSurveys){
                     if(plannedSurveyByOrgUnit.getChecked()) {
                         scheduleSurveys.add(plannedSurveyByOrgUnit.getSurvey());
@@ -160,6 +176,7 @@ public class PlannedPerOrgUnitFragment extends ListFragment {
                 }
 
                 if(scheduleSurveys.size()==0) return;
+
 
                 new ScheduleListener(scheduleSurveys,adapter.getContext());
             }
@@ -169,34 +186,25 @@ public class PlannedPerOrgUnitFragment extends ListFragment {
 
     public static void enableScheduleButton(){
         scheduleButton.setEnabled(true);
-        scheduleButton.setBackgroundColor(ContextCompat.getColor(PreferencesState.getInstance().getContext(),R.color.dark_navy_blue));
     }
     public static void disableScheduleButton(){
         scheduleButton.setEnabled(false);
-        scheduleButton.setBackgroundColor(ContextCompat.getColor(PreferencesState.getInstance().getContext(),R.color.common_plus_signin_btn_text_light_disabled));
     }
 
     public void resetList() {
+        refreshMenuDots();
         this.adapter.notifyDataSetChanged();
     }
     /**
      * Initializes the listview component, adding a listener for swiping right
      */
     private void initListView(){
-        LayoutInflater inflater = LayoutInflater.from(PreferencesState.getInstance().getContext().getApplicationContext());
-        View header = inflater.inflate(this.adapter.getHeaderLayout(), null, false);
-        selectAllCheckbox=(CustomCheckBox) header.findViewById(R.id.select_all_orgunits);
         selectAllCheckbox.setOnCheckedChangeListener(new CompoundButton.OnCheckedChangeListener() {
             @Override
             public void onCheckedChanged(CompoundButton buttonView,boolean isChecked) {
                 checkAll(isChecked);
             }
         });
-        ListView listView = getListView();
-        if(listView.getHeaderViewsCount()==0)
-            listView.addHeaderView(header);
-        setListAdapter((BaseAdapter) adapter);
-        Session.listViewSent = listView;
     }
 
     private void checkAll(boolean value) {
@@ -211,6 +219,7 @@ public class PlannedPerOrgUnitFragment extends ListFragment {
         }else{
             disableScheduleButton();
         }
+        resetList();
     }
 
     /**
@@ -220,22 +229,18 @@ public class PlannedPerOrgUnitFragment extends ListFragment {
      * @param plannedItems
      */
     private void initAdapter(List<PlannedSurveyByOrgUnit> plannedItems){
-        IDashboardAdapter adapterInSession = Session.getAdapterOrgUnit();
-        if(adapterInSession == null){
-            adapterInSession = new PlanningPerOrgUnitAdapter(plannedItems, getActivity());
-        }else{
-            adapterInSession = adapterInSession.newInstance(plannedItems, getActivity());
-        }
-        this.adapter = adapterInSession;
-        Session.setAdapterOrgUnit(this.adapter);
+        this.adapter  = new PlanningPerOrgUnitAdapter(plannedItems, getActivity(), new Callback() {
+            @Override
+            public void onItemCheckboxChanged() {
+                resetList();
+            }
+        });
+        setListAdapter(adapter);
     }
 
     @Override
     public void onResume(){
         Log.d(TAG, "onResume");
-        //Loading...
-        setListShown(false);
-        //Listen for data
         registerPlannedItemsReceiver();
         super.onResume();
     }
@@ -263,7 +268,7 @@ public class PlannedPerOrgUnitFragment extends ListFragment {
 
         if (plannedItemsReceiver == null) {
             plannedItemsReceiver = new PlannedItemsReceiver();
-            LocalBroadcastManager.getInstance(getActivity()).registerReceiver(plannedItemsReceiver, new IntentFilter(SurveyService.PLANNED_SURVEYS_ACTION));
+            LocalBroadcastManager.getInstance(getActivity()).registerReceiver(plannedItemsReceiver, new IntentFilter(PlannedSurveyService.PLANNED_PER_ORG_UNIT_SURVEYS_ACTION));
         }
     }
     /**
@@ -280,8 +285,8 @@ public class PlannedPerOrgUnitFragment extends ListFragment {
 
     public void reloadData(){
         //Reload data using service
-        Intent surveysIntent=new Intent(PreferencesState.getInstance().getContext().getApplicationContext(), SurveyService.class);
-        surveysIntent.putExtra(SurveyService.SERVICE_METHOD, SurveyService.PLANNED_SURVEYS_ACTION);
+        Intent surveysIntent=new Intent(PreferencesState.getInstance().getContext().getApplicationContext(), PlannedSurveyService.class);
+        surveysIntent.putExtra(PlannedSurveyService.SERVICE_METHOD, PlannedSurveyService.PLANNED_PER_ORG_UNIT_SURVEYS_ACTION);
         PreferencesState.getInstance().getContext().getApplicationContext().startService(surveysIntent);
     }
 
@@ -314,8 +319,8 @@ public class PlannedPerOrgUnitFragment extends ListFragment {
         public void onReceive(Context context, Intent intent) {
             Log.d(TAG, "onReceive");
             //Listening only intents from this method
-            if(SurveyService.PLANNED_SURVEYS_ACTION.equals(intent.getAction())){
-                PlannedServiceBundle plannedServiceBundle= (PlannedServiceBundle)Session.popServiceValue(SurveyService.PLANNED_SURVEYS_ACTION);
+            if(PlannedSurveyService.PLANNED_PER_ORG_UNIT_SURVEYS_ACTION.equals(intent.getAction())){
+                PlannedServiceBundle plannedServiceBundle= (PlannedServiceBundle)Session.popServiceValue(PlannedSurveyService.PLANNED_PER_ORG_UNIT_SURVEYS_ACTION);
                 List<PlannedSurveyByOrgUnit> items= new ArrayList<>();
                 for(PlannedItem item: plannedServiceBundle.getPlannedItems()){
                     if(item instanceof PlannedSurvey && isNotFiltered(item)){

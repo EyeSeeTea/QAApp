@@ -34,14 +34,16 @@ import android.preference.Preference;
 import android.preference.PreferenceActivity;
 import android.preference.PreferenceFragment;
 import android.preference.PreferenceManager;
+import android.preference.PreferenceScreen;
+import android.support.annotation.NonNull;
 import android.util.DisplayMetrics;
 import android.util.Log;
 
+import org.eyeseetea.malariacare.data.database.utils.LanguageContextWrapper;
 import org.eyeseetea.malariacare.data.database.utils.PreferencesState;
 import org.eyeseetea.malariacare.data.repositories.UserAccountRepository;
 import org.eyeseetea.malariacare.domain.usecase.LogoutUseCase;
 import org.eyeseetea.malariacare.layout.dashboard.builder.AppSettingsBuilder;
-
 import java.util.HashMap;
 import java.util.List;
 import java.util.Locale;
@@ -144,6 +146,8 @@ public class SettingsActivity extends PreferenceActivity implements
                 findPreference(getApplicationContext().getString(R.string.font_sizes)));
         bindPreferenceSummaryToValue(findPreference(getString(R.string.dhis_max_items)));
 
+        bindPreferenceSummaryToValue(findPreference(getString(R.string.monitoring_target)));
+
         Preference serverUrlPreference = (Preference) findPreference(
                 getResources().getString(R.string.dhis_url));
         Preference userPreference = (Preference) findPreference(
@@ -166,72 +170,25 @@ public class SettingsActivity extends PreferenceActivity implements
                 new LoginRequiredOnPreferenceClickListener(this));
         passwordPreference.setOnPreferenceClickListener(
                 new LoginRequiredOnPreferenceClickListener(this));
+
+        PreferenceScreen preferenceScreen = getPreferenceScreen();
+
+        if(BuildConfig.customFontHidden) {
+            hideFontCustomisationOption(preferenceScreen);
+        }
     }
+
+
 
     /**
      * Sets the application languages and populate the language in the preference
      */
     private static void setLanguageOptions(Preference preference) {
         ListPreference listPreference = (ListPreference) preference;
-
-        HashMap<String, String> languages = getAppLanguages(R.string.system_defined);
-
-        CharSequence[] newEntries = new CharSequence[languages.size() + 1];
-        CharSequence[] newValues = new CharSequence[languages.size() + 1];
-        int i = 0;
-        newEntries[i] = PreferencesState.getInstance().getContext().getString(
-                R.string.system_defined);
-        newValues[i] = "";
-        for (String language : languages.keySet()) {
-            i++;
-            String languageCode = languages.get(language);
-            String firstLetter = language.substring(0, 1).toUpperCase();
-            language = firstLetter + language.substring(1, language.length());
-            newEntries[i] = language;
-            newValues[i] = languageCode;
-        }
-
-        listPreference.setEntries(newEntries);
-        listPreference.setEntryValues(newValues);
+        listPreference.setEntries(R.array.languages_strings);
+        listPreference.setEntryValues(R.array.languages_codes);
     }
 
-    /**
-     * This method finds the existing app translations
-     * * @param stringId this string id should be different in all value-xx/string.xml files. Else
-     * the language can be ignored
-     */
-    public static HashMap<String, String> getAppLanguages(int stringId) {
-        HashMap<String, String> languages = new HashMap<>();
-        Context context = PreferencesState.getInstance().getContext();
-        DisplayMetrics metrics = context.getResources().getDisplayMetrics();
-        Resources r = context.getResources();
-        Configuration c = r.getConfiguration();
-        Locale currentLocale = c.locale;
-        if (currentLocale.getLanguage().isEmpty()) {
-            currentLocale = new Locale(PreferencesState.getInstance().getPhoneLanguage());
-        }
-        String[] loc = r.getAssets().getLocales();
-        for (int i = 0; i < loc.length; i++) {
-            c.locale = new Locale(loc[i]);
-            Resources res = new Resources(context.getAssets(), metrics, c);
-            String s1 = res.getString(stringId);
-
-            String language = new Locale(loc[i]).getDisplayLanguage(currentLocale);
-            c.locale = new Locale("");
-            Resources res2 = new Resources(context.getAssets(), metrics, c);
-            String s2 = res2.getString(stringId);
-
-            //Compare with the default language
-            if (!s1.equals(s2)) {
-                languages.put(language, loc[i]);
-            }
-            Locale defaultLocale = new Locale(BuildConfig.defaultLocale);
-            languages.put(defaultLocale.getDisplayLanguage(currentLocale),
-                    defaultLocale.getLanguage());
-
-        }
-        return languages;
-    }
     /**
      * {@inheritDoc}
      */
@@ -454,6 +411,25 @@ public class SettingsActivity extends PreferenceActivity implements
         return callerActivity;
     }
 
+    private void hideFontCustomisationOption(@NonNull PreferenceScreen preferenceScreen) {
+        Context context = preferenceScreen.getContext();
+
+        Preference customizeFonts = preferenceScreen.findPreference(
+                context.getString(R.string.customize_fonts));
+
+        Preference fontSizes = preferenceScreen.findPreference(
+                context.getString(R.string.font_sizes));
+
+        preferenceScreen.removePreference(customizeFonts);
+        preferenceScreen.removePreference(fontSizes);
+    }
+
+    @Override
+    protected void attachBaseContext(Context newBase) {
+        String currentLanguage = PreferencesState.getInstance().getCurrentLocale();
+        Context context = LanguageContextWrapper.wrap(newBase, currentLanguage);
+        super.attachBaseContext(context);
+    }
 }
 
 /**

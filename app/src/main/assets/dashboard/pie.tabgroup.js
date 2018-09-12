@@ -17,11 +17,28 @@ THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLI
         valueC:0
     })
 */
-
 var green;
 var yellow;
 var red;
+var high;
+var medium;
+var low;
+var mediumPieFormatted;
 
+function setClassification(classification){
+    high=classification["high"];
+    medium=classification["medium"];
+    low=classification["low"];
+    mediumPieFormatted=classification["mediumFormatted"];
+}
+function setGreen(color){
+    green=color["color"];
+    //console.log(green);
+}
+function setGreen(color){
+    green=color["color"];
+    //console.log(green);
+}
 function setGreen(color){
     green=color["color"];
     //console.log(green);
@@ -36,6 +53,7 @@ function setRed(color){
     red=color["color"];
     //console.log(red);
 }
+
 function pieXTabGroupChart(data){
 
     var canvasDOMId="tabgroupCanvas"+data.idTabGroup;
@@ -48,25 +66,21 @@ function pieXTabGroupChart(data){
 
     //Chart
     var ctx = document.getElementById(canvasDOMId).getContext("2d");
-    var  myChart  = new Chart(ctx).Doughnut(
+    var  myChart  = new Chart(ctx).Pie(
                                [{
                                    value: data.valueA,
                                    color: green,
-                                   label: "A (>80)"
+                                   label: "A (>"+high+")"
                                }, {
                                    value: data.valueB,
                                    color: yellow,
-                                   label: "B (50-80)"
+                                   label: "B ("+mediumPieFormatted+")"
                                }, {
                                    value: data.valueC,
                                    color: red,
-                                   label: "C (<50)"
+                                   label: "C (<"+low+")"
                                }],
                                {
-                                   segmentShowStroke: false,
-                                   animateRotate: false,
-                                   animateScale: false,
-                                   percentageInnerCutout: 50,
                                    tooltipTemplate: "<%= value %>",
                                    onAnimationComplete: function(){
                                        this.showTooltip(this.segments, true);
@@ -103,112 +117,10 @@ function pieXTabGroupChart(data){
         }
         ]);
 */
-var selectedPie;
-var piesDataByProgram;
-var piesDataByOrgUnit;
-//Show tables/Pies by program.
-function showProgram(){
-    removeDataPie();
-	changePieAndTablesByProgram();
-}
-
-//Show tables/Pies by org unit.
-function showOrgUnit(){
-    removeDataPie();
-	changePieAndTablesByOrgUnit();
-}
-
-//Save the pie data by uid(program or org unit)
-function setProgramPieData(data){
-    piesDataByProgram=data;
-}
-//Save the pie data by uid(program or org unit)
-function setOrgUnitPieData(data){
-    piesDataByOrgUnit=data;
-}
-
-//event on click select/or in program "spinner" to change the selected program and reload.
-function changePieAndTablesByProgram(){
-	selectedPie="";
-	findProgram=false;
-	for(var i=0;i<Object.keys(piesDataByProgram).length;i++){
-		if(piesDataByProgram[i].uidprogram==selectedProgram){
-			selectedPie=piesDataByProgram[i].uidprogram;
-			findProgram=true;
-			break;
-		}
-	}
-     noSurveysId="noSurveysText";
-	 if(!findProgram){
-            updateChartTitle(noSurveysId,messages["noSurveys"]);
-        }else{
-            updateChartTitle(noSurveysId,"");
-        }
-
-    if(selectedProgram===allAssessmentKey){
-        rebuildTableFacilities(selectedOrgUnit);
-    }else{
-        renderPieChartsByProgram();
-    }
-}
-
-//event on click select/or in program "spinner" to change the selected program and reload.
-function changePieAndTablesByOrgUnit(){
-	selectedPie="";
-	for(var i=0;i<Object.keys(piesDataByOrgUnit).length;i++){
-		if(piesDataByOrgUnit[i].uidorgunit==selectedOrgUnit){
-			selectedPie=piesDataByOrgUnit[i].uidorgunit;
-			break;
-		}
-	}
-    if(selectedOrgUnit===allOrgUnitKey){
-        rebuildTableFacilities(selectedOrgUnit);
-    }
-	else{
-        renderPieChartsByOrgUnit();
-	}
-}
 //Save the data of the pies
 function buildPieCharts(dataPies){
     //For each pie
 	setPieData(dataPies);
-}
-
-//Render the pie and table by program filter and reload the spinners
-function renderPieChartsByProgram(){
-	var programOrgUnit="";
-    if(selectedProgram!=""){
-        for(var i=0;i<piesDataByProgram.length;i++){
-            if (piesDataByProgram[i].uidprogram==selectedProgram){
-				programOrgUnit=piesDataByProgram[i].uidprogram;
-                showDataPie(piesDataByProgram[i]);
-				break;
-            }
-        }
-        rebuildTableFacilities(programOrgUnit);
-    }
-	reloadSpinners();
-}
-
-function reloadSpinners(){
-    createSpinnerProgram();
-    createSpinnerOrgUnit();
-}
-
-//Render the pie and table by orgUnit filter and reload the spinners
-function renderPieChartsByOrgUnit(){
-	var orgUnitPrograms;
-    if(selectedOrgUnit!=""){
-        for(var i=0;i<piesDataByOrgUnit.length;i++){
-            if (piesDataByOrgUnit[i].uidorgunit==selectedOrgUnit){
-				orgUnitPrograms=piesDataByOrgUnit[i].uidorgunit;
-                showDataPie(piesDataByOrgUnit[i]);
-				break;
-            }
-        }
-        rebuildTableFacilities(orgUnitPrograms);
-    }
-	reloadSpinners();
 }
 
 //Insert the pie in the html

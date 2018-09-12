@@ -20,15 +20,17 @@
 package org.eyeseetea.malariacare.layout.utils;
 
 import com.google.common.primitives.Booleans;
-import com.raizlabs.android.dbflow.structure.BaseModel;
 
-import org.eyeseetea.malariacare.data.database.model.Header;
-import org.eyeseetea.malariacare.data.database.model.Question;
-import org.eyeseetea.malariacare.data.database.model.Survey;
+import org.eyeseetea.malariacare.data.database.model.HeaderDB;
+import org.eyeseetea.malariacare.data.database.model.QuestionDB;
 import org.eyeseetea.malariacare.data.database.utils.ReadWriteDB;
 import org.eyeseetea.malariacare.data.database.utils.Session;
+import org.eyeseetea.malariacare.domain.entity.Question;
+import org.eyeseetea.malariacare.domain.subscriber.DomainEventPublisher;
+import org.eyeseetea.malariacare.domain.subscriber.event.ValueChangedEvent;
 import org.eyeseetea.malariacare.layout.score.ScoreRegister;
 
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashMap;
 import java.util.LinkedHashMap;
@@ -48,13 +50,13 @@ public class AutoTabInVisibilityState {
         rowsMap = new HashMap<>();
     }
 
-    public boolean initVisibility(Header header){
+    public boolean initVisibility(HeaderDB header){
         boolean invisible=true;
         elementInvisibility.put(header, invisible);
         return !invisible;
     }
 
-    public boolean initVisibility(Question question, float idSurvey){
+    public boolean initVisibility(QuestionDB question, float idSurvey){
         boolean hidden = isHidden(question, idSurvey);
         elementInvisibility.put(question, hidden);
         return !hidden;
@@ -63,7 +65,7 @@ public class AutoTabInVisibilityState {
     public boolean initVisibility(QuestionRow questionRow, float idSurvey){
         boolean hidden = isHidden(questionRow, idSurvey);
         elementInvisibility.put(questionRow,hidden);
-        for(Question question:questionRow.getQuestions()){
+        for(QuestionDB question:questionRow.getQuestions()){
             rowsMap.put(question.getId_question(),questionRow);
         }
         return  !hidden;
@@ -74,7 +76,7 @@ public class AutoTabInVisibilityState {
      * @param question
      * @return
      */
-    public boolean isHidden(Question question, float idSurvey) {
+    public boolean isHidden(QuestionDB question, float idSurvey) {
         return question.isHiddenBySurvey(idSurvey);
     }
 
@@ -88,7 +90,7 @@ public class AutoTabInVisibilityState {
             return true;
         }
 
-        Question question = questionRow.getFirstQuestion();
+        QuestionDB question = questionRow.getFirstQuestion();
 
         return isHidden(question,idSurvey);
     }
@@ -101,15 +103,15 @@ public class AutoTabInVisibilityState {
         return !elementInvisibility.get(key);
     }
 
-    public void updateHeaderVisibility(Question question){
-        Header header = question.getHeader();
+    public void updateHeaderVisibility(QuestionDB question){
+        HeaderDB header = question.getHeader();
         boolean headerInvisible = elementInvisibility.get(header);
         elementInvisibility.put(header, headerInvisible && elementInvisibility.get(question));
     }
 
     public void updateHeaderVisibility(QuestionRow questionRow){
-        Question firstQuestion=questionRow.getFirstQuestion();
-        Header header = firstQuestion.getHeader();
+        QuestionDB firstQuestion=questionRow.getFirstQuestion();
+        HeaderDB header = firstQuestion.getHeader();
         boolean headerVisibility = elementInvisibility.get(header);
         elementInvisibility.put(header, headerVisibility && elementInvisibility.get(questionRow));
     }
@@ -119,11 +121,11 @@ public class AutoTabInVisibilityState {
      * @param header
      * @return true: Visible | false: Invisible
      */
-    public void updateHeaderVisibility(Header header){
+    public void updateHeaderVisibility(HeaderDB header){
         elementInvisibility.put(header, hasToHideHeader(header));
     }
 
-    public void updateVisibility(Question question, boolean visible){
+    public void updateVisibility(QuestionDB question, boolean visible){
         Object key=question;
         if(question.belongsToCustomTab()){
             key=rowsMap.get(question.getId_question());
@@ -151,32 +153,49 @@ public class AutoTabInVisibilityState {
      * became invisible, that header is also hidden
      */
     public void toggleChildrenVisibility(AutoTabSelectedItem autoTabSelectedItem, float idSurvey, String module) {
-        Question question = autoTabSelectedItem.getQuestion();
+        QuestionDB question = autoTabSelectedItem.getQuestion();
+        List<Question> toggledQuestions= new ArrayList<>();
         if(question.hasChildren()) {
-            recursiveToggleChildrenVisibility(idSurvey, module, question);
+            recursiveToggleChildrenVisibility(idSurvey, module, question, toggledQuestions);
+        }
+        if(toggledQuestions.size()>0){
+            DomainEventPublisher
+                    .instance()
+                    .publish(new ValueChangedEvent(Session.getSurveyByModule(module).getId_survey(), toggledQuestions, ValueChangedEvent.Action.TOGGLE));
         }
     }
 
-    private void recursiveToggleChildrenVisibility(float idSurvey, String module, Question parentQuestion) {
+    private List<Question> recursiveToggleChildrenVisibility(float idSurvey, String module, QuestionDB parentQuestion, List<Question> toggledQuestions) {
         boolean visible;
-        for (Question childQuestion : parentQuestion.getChildren()) {
-            Header childHeader = childQuestion.getHeader();
-            visible=!childQuestion.isHiddenBySurvey(idSurvey);
-            this.updateVisibility(childQuestion,visible);
+        for (QuestionDB childQuestion : parentQuestion.getChildren()) {
+            Question toggledQuestion = null;
+            HeaderDB childHeader = childQuestion.getHeader();
+            visible=!childQuestion.isHiddenBySurvey(idSurvey);boolean isAlreadyVisible=(elementInvisibility.containsKey(childQuestion) && elementInvisibility.get(childQuestion)!=true);
+            if(visible || isAlreadyVisible) {
+                toggledQuestion = new Question(childQuestion.getId_question(), childQuestion.getOutput(), childQuestion.getCompulsory(), visible);
+            }
 
+            this.updateVisibility(childQuestion,visible);
             //Show child -> Show header, Update scores
             if(visible){
                 Float num = ScoreRegister.calcNum(childQuestion, idSurvey);
                 Float denum = (num == null) ? 0f: ScoreRegister.calcDenum(childQuestion, idSurvey);;
                 ScoreRegister.addRecord(childQuestion, 0f, denum, idSurvey, module);
                 this.setInvisible(childHeader,false);
+                if(toggledQuestion!=null && isAlreadyVisible==false){
+                    toggledQuestions.add(toggledQuestion);//Added new visible child question
+                }
                 continue;
             }
 
             //Hide child ...
             //-> Remove value
-            ReadWriteDB.deleteValue(childQuestion, module);
+            boolean isRemoved = ReadWriteDB.deleteValue(childQuestion, module, false);
 
+            if(toggledQuestion!=null){
+                toggledQuestion.setRemoved(isRemoved);//Set question as removed if it is necessary to removes the answered question ratio
+                toggledQuestions.add(toggledQuestion);//Add not visible child to be removed from total question list
+            }
             //-> Remove score
             if (ScoreRegister.getNumDenum(childQuestion, idSurvey, module) != null) {
                 ScoreRegister.deleteRecord(childQuestion, idSurvey, module);
@@ -188,8 +207,9 @@ public class AutoTabInVisibilityState {
             //-> Check header visibility
             this.updateHeaderVisibility(childHeader);
             if(childQuestion.hasChildren())
-                recursiveToggleChildrenVisibility(idSurvey, module, childQuestion);
+                recursiveToggleChildrenVisibility(idSurvey, module, childQuestion, toggledQuestions);
         }
+        return toggledQuestions;
     }
 
     /**
@@ -198,8 +218,8 @@ public class AutoTabInVisibilityState {
      * @param idSurvey
      * @param module
      */
-    public void removeScoreRecursively(Question question, float idSurvey, String module){
-        for(Question child: question.getChildren()){
+    public void removeScoreRecursively(QuestionDB question, float idSurvey, String module){
+        for(QuestionDB child: question.getChildren()){
             removeScoreRecursively(child, idSurvey, module);
         }
         if (ScoreRegister.getNumDenum(question, idSurvey, module) != null) {
@@ -212,8 +232,8 @@ public class AutoTabInVisibilityState {
      * @param question
      * @param module
      */
-    public void deleteChildrenValueRecursively(Question question, String module){
-        for(Question child: question.getChildren()){
+    public void deleteChildrenValueRecursively(QuestionDB question, String module){
+        for(QuestionDB child: question.getChildren()){
             deleteChildrenValueRecursively(child, module);
         }
         ReadWriteDB.deleteValue(question, module);
@@ -234,9 +254,9 @@ public class AutoTabInVisibilityState {
      * @param header header that
      * @return true if every header question is hidden, false otherwise
      */
-    private boolean hasToHideHeader(Header header) {
+    private boolean hasToHideHeader(HeaderDB header) {
         // look in every question to see if every question is hidden. In case one cuestion is not hidden, we return false
-        for (Question question : header.getQuestions()) {
+        for (QuestionDB question : header.getQuestions()) {
             //Find the right visibility key (questionRow | question)
             Object key=question.belongsToCustomTab()?rowsMap.get(question.getId_question()):question;
             if (!elementInvisibility.get(key)) {

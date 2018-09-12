@@ -22,10 +22,9 @@ import android.content.Context;
 import android.util.Log;
 import android.webkit.WebView;
 
-import org.eyeseetea.malariacare.data.database.model.OrgUnit;
-import org.eyeseetea.malariacare.data.database.model.Survey;
-import org.eyeseetea.malariacare.data.database.utils.monitor.allassessments.EntrySentSurveysChartByOrgUnit;
-import org.eyeseetea.malariacare.data.database.utils.monitor.allassessments.SentSurveysBuilderBase;
+import org.eyeseetea.malariacare.data.database.model.OrgUnitDB;
+import org.eyeseetea.malariacare.data.database.model.SurveyDB;
+import org.eyeseetea.malariacare.data.database.utils.PreferencesState;
 
 import java.util.ArrayList;
 import java.util.Date;
@@ -41,7 +40,7 @@ public class SentSurveysBuilderByOrgUnit extends SentSurveysBuilderBase {
     /**
      * List of sent surveys
      */
-    List<OrgUnit>  orgUnits;
+    List<OrgUnitDB>  orgUnits;
     /**
      * Map of entries per month
      */
@@ -53,7 +52,7 @@ public class SentSurveysBuilderByOrgUnit extends SentSurveysBuilderBase {
      * @param context
      * @param orgUnits
      */
-    public SentSurveysBuilderByOrgUnit(List<Survey> surveyList, Context context, List<OrgUnit> orgUnits) {
+    public SentSurveysBuilderByOrgUnit(List<SurveyDB> surveyList, Context context, List<OrgUnitDB> orgUnits) {
         super(surveyList, context);
         this.orgUnits=orgUnits;
         sentSurveysChartMap= new HashMap<>();
@@ -73,7 +72,7 @@ public class SentSurveysBuilderByOrgUnit extends SentSurveysBuilderBase {
             EntrySentSurveysChartByOrgUnit entryMonth=sentSurveysChartMap.get(currentMonth+orgUnit.getUid());
             //No entry for this month ->0
             if(entryMonth==null){
-                entryMonth=new EntrySentSurveysChartByOrgUnit(EXPECTED_SENT_SURVEYS_PER_MONTH,iMonth, orgUnit);
+                entryMonth=new EntrySentSurveysChartByOrgUnit(PreferencesState.getInstance().getMonitoringTarget(),iMonth, orgUnit);
             }
             //Whatever was calculated
             last6entries.add(0,entryMonth);
@@ -87,7 +86,7 @@ public class SentSurveysBuilderByOrgUnit extends SentSurveysBuilderBase {
      */
     public void addDataInChart(WebView webView){
         //Build entries
-        for(OrgUnit orgUnit:orgUnits) {
+        for(OrgUnitDB orgUnit:orgUnits) {
             this.orgUnit = orgUnit;
             build(surveyList);
             //Take only 6 months from now
@@ -102,8 +101,6 @@ public class SentSurveysBuilderByOrgUnit extends SentSurveysBuilderBase {
      * @param entries List of entries for the chart
      */
     private void injectDataInChart(WebView webView, List<EntrySentSurveysChartByOrgUnit> entries){
-        //Set chart title
-        injectChartTitle(webView);
 
         //Add data to the chart
         for(EntrySentSurveysChartByOrgUnit entry:entries){
@@ -117,8 +114,8 @@ public class SentSurveysBuilderByOrgUnit extends SentSurveysBuilderBase {
      * @param surveys List of sent surveys to create the list
      * @return
      */
-    public void build(List<Survey> surveys){
-        for(Survey survey:surveys){
+    public void build(List<SurveyDB> surveys){
+        for(SurveyDB survey:surveys){
             if(survey.getOrgUnit().equals(orgUnit)) {
 
                 //Get the month for the survey (key)
@@ -127,7 +124,7 @@ public class SentSurveysBuilderByOrgUnit extends SentSurveysBuilderBase {
                 //Get the entry for that month
                 EntrySentSurveysChartByOrgUnit entrySentSurveysChartByOrgUnit = sentSurveysChartMap.get(month+orgUnit.getUid());
                 if (entrySentSurveysChartByOrgUnit == null) {
-                    entrySentSurveysChartByOrgUnit = new EntrySentSurveysChartByOrgUnit(EXPECTED_SENT_SURVEYS_PER_MONTH, survey.getCompletionDate(), orgUnit);
+                    entrySentSurveysChartByOrgUnit = new EntrySentSurveysChartByOrgUnit(PreferencesState.getInstance().getMonitoringTarget(), survey.getCompletionDate(), orgUnit);
                     sentSurveysChartMap.put(month+orgUnit.getUid(), entrySentSurveysChartByOrgUnit);
                 }
                 entrySentSurveysChartByOrgUnit.incSent();

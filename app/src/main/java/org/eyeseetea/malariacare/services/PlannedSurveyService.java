@@ -6,8 +6,8 @@ import android.support.annotation.Nullable;
 import android.support.v4.content.LocalBroadcastManager;
 import android.util.Log;
 
-import org.eyeseetea.malariacare.data.database.model.OrgUnit;
-import org.eyeseetea.malariacare.data.database.model.Program;
+import org.eyeseetea.malariacare.data.database.model.OrgUnitDB;
+import org.eyeseetea.malariacare.data.database.model.ProgramDB;
 import org.eyeseetea.malariacare.data.database.utils.Session;
 import org.eyeseetea.malariacare.data.database.utils.planning.PlannedItemBuilder;
 import org.eyeseetea.malariacare.data.database.utils.services.PlannedServiceBundle;
@@ -25,6 +25,11 @@ public class PlannedSurveyService extends IntentService {
      */
     public static final String PLANNED_SURVEYS_ACTION =
             "org.eyeseetea.malariacare.services.SurveyService.PLANNED_SURVEYS_ACTION";
+    /**
+     * Name of the parameter that holds every survey that goes into the org unit planned tab
+     */
+    public static final String PLANNED_PER_ORG_UNIT_SURVEYS_ACTION =
+            "org.eyeseetea.malariacare.services.SurveyService.PLANNED_PER_ORG_UNIT_SURVEYS_ACTION";
 
     /**
      * Creates an IntentService.  Invoked by your subclass's constructor.
@@ -45,16 +50,29 @@ public class PlannedSurveyService extends IntentService {
         if (intent.getStringExtra(SERVICE_METHOD).equals(PLANNED_SURVEYS_ACTION)) {
             reloadPlannedSurveys();
         }
+        if (intent.getStringExtra(SERVICE_METHOD).equals(PLANNED_PER_ORG_UNIT_SURVEYS_ACTION)){
+            reloadPlannedSurveysPerOrgUnit();
+        }
     }
 
     private void reloadPlannedSurveys() {
         Log.d(getClass().getName(), "reloadPlanningSurveys");
         PlannedServiceBundle plannedServiceBundle = new PlannedServiceBundle();
-        plannedServiceBundle.setPlannedItems(PlannedItemBuilder.getInstance().buildPlannedItems());
-        plannedServiceBundle.addModelList(OrgUnit.class.getName(), OrgUnit.getAllOrgUnit());
-        plannedServiceBundle.addModelList(Program.class.getName(), Program.getAllPrograms());
+        plannedServiceBundle.setPlannedItems(new PlannedItemBuilder().buildPlannedItems());
+        plannedServiceBundle.addModelList(OrgUnitDB.class.getName(), OrgUnitDB.getAllOrgUnit());
+        plannedServiceBundle.addModelList(ProgramDB.class.getName(), ProgramDB.getAllPrograms());
         Session.putServiceValue(PLANNED_SURVEYS_ACTION, plannedServiceBundle);
         //Returning result to anyone listening
         LocalBroadcastManager.getInstance(this).sendBroadcast(new Intent(PLANNED_SURVEYS_ACTION));
+    }
+    private void reloadPlannedSurveysPerOrgUnit() {
+        Log.d(getClass().getName(), "reloadPlanningSurveys");
+        PlannedServiceBundle plannedServiceBundle = new PlannedServiceBundle();
+        plannedServiceBundle.setPlannedItems(new PlannedItemBuilder().buildPlannedItems());
+        plannedServiceBundle.addModelList(OrgUnitDB.class.getName(), OrgUnitDB.getAllOrgUnit());
+        plannedServiceBundle.addModelList(ProgramDB.class.getName(), ProgramDB.getAllPrograms());
+        Session.putServiceValue(PLANNED_PER_ORG_UNIT_SURVEYS_ACTION, plannedServiceBundle);
+        //Returning result to anyone listening
+        LocalBroadcastManager.getInstance(this).sendBroadcast(new Intent(PLANNED_PER_ORG_UNIT_SURVEYS_ACTION));
     }
 }

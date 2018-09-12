@@ -24,6 +24,7 @@ public class Constants {
 
 
 
+    public static final String SYSTEM_DEFINED_LANGUAGE = "system_defined";
     public static final String DEFAULT_SELECT_OPTION = "";
 
     public static final int MAX_INT_CHARS = 5;
@@ -74,9 +75,6 @@ public class Constants {
             AUTHORIZE_PULL = 1;
 
     public static final String CHECKBOX_YES_OPTION="Yes";
-
-    public static final float MAX_AMBER = 80f;
-    public static final float MAX_RED = 50f;
 
     //Keys used to know if a survey is saved in surveyfragment, in feedbackfragment, or in push.
     public static final String PUSH_MODULE_KEY="PUSH_MODULE_KEY";

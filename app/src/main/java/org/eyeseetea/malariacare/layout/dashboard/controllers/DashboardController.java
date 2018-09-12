@@ -19,20 +19,29 @@
 
 package org.eyeseetea.malariacare.layout.dashboard.controllers;
 
+import android.app.AlertDialog;
 import android.content.res.Resources;
 import android.os.Bundle;
+import android.view.LayoutInflater;
+import android.view.View;
+import android.widget.Button;
 import android.widget.ImageView;
 import android.widget.LinearLayout;
 import android.widget.TabHost;
 import android.widget.TabWidget;
+import android.widget.TextView;
 
 import org.eyeseetea.malariacare.DashboardActivity;
 import org.eyeseetea.malariacare.R;
-import org.eyeseetea.malariacare.data.database.model.OrgUnit;
-import org.eyeseetea.malariacare.data.database.model.Program;
-import org.eyeseetea.malariacare.data.database.model.Survey;
+import org.eyeseetea.malariacare.data.database.model.OrgUnitDB;
+import org.eyeseetea.malariacare.data.database.model.ProgramDB;
+import org.eyeseetea.malariacare.data.database.model.SurveyDB;
+import org.eyeseetea.malariacare.data.database.model.SurveyScheduleDB;
+import org.eyeseetea.malariacare.data.database.utils.planning.ScheduleListener;
 import org.eyeseetea.malariacare.layout.dashboard.config.DashboardOrientation;
 import org.eyeseetea.malariacare.layout.dashboard.config.DashboardSettings;
+import org.eyeseetea.malariacare.utils.AUtils;
+import org.eyeseetea.malariacare.views.CustomTextView;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -237,7 +246,7 @@ public class DashboardController {
      * Starts or edits the given survey from the planning tab
      * @param survey
      */
-    public void onSurveySelected(Survey survey){
+    public void onSurveySelected(SurveyDB survey){
 
         if(DashboardOrientation.VERTICAL.equals(getOrientation())){
             //Mark currentTab (only necessary for vertical orientation)
@@ -258,7 +267,7 @@ public class DashboardController {
      * Starts the org unit planning tab
      * @param orgUnit
      */
-    public void onOrgUnitSelected(OrgUnit orgUnit) {
+    public void onOrgUnitSelected(OrgUnitDB orgUnit) {
         PlanModuleController planModuleController = (PlanModuleController)getModuleByName(PlanModuleController.getSimpleName());
         planModuleController.onOrgUnitSelected(orgUnit);
     }
@@ -266,7 +275,7 @@ public class DashboardController {
      * Starts the program planning tab
      * @param program
      */
-    public void onProgramSelected(Program program) {
+    public void onProgramSelected(ProgramDB program) {
         PlanModuleController planModuleController = (PlanModuleController)getModuleByName(PlanModuleController.getSimpleName());
         planModuleController.onProgramSelected(program);
     }
@@ -274,7 +283,7 @@ public class DashboardController {
      * Marks the given survey as selected
      * @param survey
      */
-    public void onMarkAsCompleted(Survey survey){
+    public void onMarkAsCompleted(SurveyDB survey){
         //This action belongs to the assess module
         AssessModuleController assessModuleController = (AssessModuleController)getModuleByName(AssessModuleController.getSimpleName());
         assessModuleController.onMarkAsCompleted(survey);
@@ -300,11 +309,157 @@ public class DashboardController {
     }
 
     /**
+     * Called when click on assess survey
+     * @param survey
+     */
+    public void onAssessSelected(SurveyDB survey) {
+        AssessModuleController assessModuleController = (AssessModuleController)getModuleByName(AssessModuleController.getSimpleName());
+        assessModuleController.assessModelDialog(survey);
+    }
+
+    /**
      * Called when entering feedback for the given survey
      * @param survey
      */
-    public void onFeedbackSelected(Survey survey) {
+    public void onFeedbackSelected(SurveyDB survey) {
+        feedbackModelDialog(survey);
+    }
 
+    public AlertDialog feedbackModelDialog(final SurveyDB survey) {
+        AlertDialog.Builder builder = new AlertDialog.Builder(dashboardActivity);
+
+        LayoutInflater inflater = dashboardActivity.getLayoutInflater();
+
+        View v = inflater.inflate(R.layout.modal_feedback_menu, null);
+
+        builder.setView(v);
+
+        builder.setCancelable(false);
+        Button viewFeedback = (Button) v.findViewById(R.id.view);
+        Button actionPlan = (Button) v.findViewById(R.id.action_plan);
+        Button cancel = (Button) v.findViewById(R.id.cancel);
+
+        final AlertDialog alertDialog =builder.create();
+        viewFeedback.setOnClickListener(
+                new View.OnClickListener() {
+                    @Override
+                    public void onClick(View v) {
+                        openFeedback(survey, true);
+
+                        alertDialog.dismiss();
+                    }
+                }
+        );
+
+        actionPlan.setOnClickListener(
+                new View.OnClickListener() {
+                    @Override
+                    public void onClick(View v) {
+                        DashboardActivity.dashboardActivity.openActionPlan(survey);
+                        alertDialog.dismiss();
+                    }
+                }
+
+        );
+        cancel.setOnClickListener(
+                new View.OnClickListener() {
+                    @Override
+                    public void onClick(View v) {
+                        alertDialog.dismiss();
+                    }
+                }
+
+        );
+        alertDialog.show();
+        alertDialog.getWindow().setBackgroundDrawableResource(android.R.color.transparent);
+        return alertDialog;
+    }
+
+
+    public void onPlanPerOrgUnitMenuClicked(SurveyDB survey) {
+        scheduleHistoricLogDialog(survey);
+    }
+
+    public void scheduleHistoricLogDialog(final SurveyDB survey) {
+            AlertDialog.Builder builder = new AlertDialog.Builder(dashboardActivity);
+
+            LayoutInflater inflater = dashboardActivity.getLayoutInflater();
+
+            View v = inflater.inflate(R.layout.modal_schedule_plan_menu, null);
+
+            builder.setView(v);
+
+            builder.setCancelable(false);
+            Button showHistory = (Button) v.findViewById(R.id.show_history);
+            Button cancel = (Button) v.findViewById(R.id.cancel);
+
+
+            CustomTextView orgUnitTextView = (CustomTextView) v.findViewById(R.id.planned_org_unit);
+            orgUnitTextView.setText(survey.getOrgUnit().getName());
+
+            CustomTextView programTextView = (CustomTextView) v.findViewById(R.id.planned_program);
+            programTextView.setText(survey.getProgram().getName());
+
+            final AlertDialog alertDialog =builder.create();
+            showHistory.setOnClickListener(
+                    new View.OnClickListener() {
+                        @Override
+                        public void onClick(View v) {
+                            showHistory(survey);
+                            alertDialog.dismiss();
+                        }
+                    }
+            );
+            cancel.setOnClickListener(
+                    new View.OnClickListener() {
+                        @Override
+                        public void onClick(View v) {
+                            alertDialog.dismiss();
+                        }
+                    }
+
+            );
+            alertDialog.show();
+        alertDialog.getWindow().setBackgroundDrawableResource(android.R.color.transparent);
+    }
+
+    private void showHistory(SurveyDB survey) {
+        AlertDialog.Builder builder = new AlertDialog.Builder(DashboardActivity.dashboardActivity);
+        LayoutInflater inflater = DashboardActivity.dashboardActivity.getLayoutInflater();
+
+        View v = inflater.inflate(R.layout.historical_log_dialog, null);
+        builder.setView(v);
+        TextView orgUnit = (TextView) v.findViewById(R.id.org_unitName);
+        TextView program = (TextView) v.findViewById(R.id.programName);
+        program.setText(survey.getProgram().getName());
+        orgUnit.setText(survey.getOrgUnit().getName());
+        Button cancel = (Button) v.findViewById(R.id.cancel);
+        LinearLayout linearLayout = (LinearLayout) v.findViewById(R.id.log_content);
+        View row = inflater.inflate(R.layout.item_list_dialog_header, null);
+        linearLayout.addView(row);
+        for(SurveyScheduleDB surveyScheduleDB: survey.getSurveySchedules()){
+            row = inflater.inflate(R.layout.item_list_row_row, null);
+            TextView comment = (TextView) row.findViewById(R.id.first_column);
+            TextView date = (TextView) row.findViewById(R.id.second_column);
+            comment.setText(surveyScheduleDB.getComment());
+            date.setText(AUtils.getEuropeanFormatedDate(surveyScheduleDB.getPrevious_date()));
+            linearLayout.addView(row );
+        }
+        final AlertDialog alertDialog = builder.create();
+        cancel.setOnClickListener(
+                new View.OnClickListener() {
+                    @Override
+                    public void onClick(View v) {
+                        alertDialog.dismiss();
+                    }
+                }
+        );
+
+        alertDialog.show();
+    }
+
+
+    public void openFeedback(SurveyDB survey, boolean modifyFilter) {
         //Vertical -> Hide improve module
         if(DashboardOrientation.VERTICAL.equals(getOrientation())){
             //Mark currentTab (only necessary for vertical orientation)
@@ -322,7 +477,78 @@ public class DashboardController {
         }
 
         ImproveModuleController improveModuleController = (ImproveModuleController)getModuleByName(ImproveModuleController.getSimpleName());
-        improveModuleController.onFeedbackSelected(survey);
+        improveModuleController.onFeedbackSelected(survey, modifyFilter);
+        improveModuleController.setActionBarDashboardWithProgram();
+    }
+
+
+    public void onPlannedSurvey(SurveyDB survey, View.OnClickListener scheduleClickListener) {
+        plannedModelDialog(survey, scheduleClickListener);
+    }
+
+    public AlertDialog plannedModelDialog(final SurveyDB survey,
+            View.OnClickListener scheduleClickListener) {
+        AlertDialog.Builder builder = new AlertDialog.Builder(dashboardActivity);
+
+        LayoutInflater inflater = dashboardActivity.getLayoutInflater();
+
+        View v = inflater.inflate(R.layout.modal_planned_menu, null);
+
+        builder.setView(v);
+
+        builder.setCancelable(false);
+        Button add = (Button) v.findViewById(R.id.add);
+        Button change = (Button) v.findViewById(R.id.change);
+        Button cancel = (Button) v.findViewById(R.id.cancel);
+        Button showHistory = (Button) v.findViewById(R.id.show_history);
+
+
+        CustomTextView orgUnitTextView = (CustomTextView) v.findViewById(R.id.planned_org_unit);
+        orgUnitTextView.setText(survey.getOrgUnit().getName());
+
+        CustomTextView programTextView = (CustomTextView) v.findViewById(R.id.planned_program);
+        programTextView.setText(survey.getProgram().getName());
+
+        if (survey.isInProgress()) {
+            add.setText(R.string.option_edit);
+        } else {
+            add.setText(R.string.add);
+        }
+
+        final AlertDialog alertDialog =builder.create();
+        add.setOnClickListener(
+                new View.OnClickListener() {
+                    @Override
+                    public void onClick(View v) {
+                        onSurveySelected(survey);
+                        alertDialog.dismiss();
+                    }
+                }
+        );
+        ((ScheduleListener) scheduleClickListener).addAlertDialog(alertDialog);
+        change.setOnClickListener(scheduleClickListener);
+        cancel.setOnClickListener(
+                new View.OnClickListener() {
+                    @Override
+                    public void onClick(View v) {
+                        alertDialog.dismiss();
+                    }
+                }
+
+        );
+        showHistory.setOnClickListener(
+                new View.OnClickListener() {
+                    @Override
+                    public void onClick(View v) {
+                        showHistory(survey);
+                        alertDialog.dismiss();
+                    }
+                }
+        );
+
+        alertDialog.show();
+        alertDialog.getWindow().setBackgroundDrawableResource(android.R.color.transparent);
+        return alertDialog;
     }
 
     public void reloadVertical(){
@@ -419,5 +645,10 @@ public class DashboardController {
         for (int i = 0; i < tabHost.getTabWidget().getChildCount(); i++) {
             tabHost.getTabWidget().getChildAt(i).setBackgroundColor(resources.getColor(R.color.transparent));
         }
+    }
+
+    public void reloadActiveModule() {
+            ModuleController currentModuleController = getCurrentModule();
+            currentModuleController.onTabChanged();
     }
 }

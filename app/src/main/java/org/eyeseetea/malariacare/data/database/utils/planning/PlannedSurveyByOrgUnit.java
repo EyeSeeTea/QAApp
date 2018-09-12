@@ -4,7 +4,7 @@ package org.eyeseetea.malariacare.data.database.utils.planning;
  * Created by idelcano on 07/09/2016.
  */
 
-import org.eyeseetea.malariacare.data.database.model.Survey;
+import org.eyeseetea.malariacare.data.database.model.SurveyDB;
 
 /**
  * Created by ina on 16/08/2016.
@@ -13,7 +13,9 @@ public class PlannedSurveyByOrgUnit extends PlannedSurvey {
 
     private boolean isChecked;
 
-    public PlannedSurveyByOrgUnit(Survey survey, PlannedHeader header) {
+    private boolean hideMenu;
+
+    public PlannedSurveyByOrgUnit(SurveyDB survey, PlannedHeader header) {
         super(survey, header);
     }
 
@@ -25,5 +27,11 @@ public class PlannedSurveyByOrgUnit extends PlannedSurvey {
         return this.isChecked;
     }
 
+    public boolean isHideMenu() {
+        return hideMenu;
+    }
 
+    public void setHideMenu(boolean hideMenu) {
+        this.hideMenu=hideMenu;
+    }
 }

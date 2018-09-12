@@ -19,30 +19,43 @@
 
 package org.eyeseetea.malariacare.layout.dashboard.controllers;
 
+
 import android.app.AlertDialog;
 import android.content.DialogInterface;
-import android.os.AsyncTask;
-import android.text.Html;
-import android.text.Spanned;
+import android.graphics.Color;
+import android.graphics.PorterDuff;
+import android.support.annotation.NonNull;
 import android.util.Log;
+import android.view.View;
+import android.widget.Button;
 
 import org.eyeseetea.malariacare.DashboardActivity;
 import org.eyeseetea.malariacare.R;
-import org.eyeseetea.malariacare.data.database.model.Survey;
+import org.eyeseetea.malariacare.data.database.model.SurveyDB;
 import org.eyeseetea.malariacare.data.database.utils.PreferencesState;
 import org.eyeseetea.malariacare.data.database.utils.Session;
-import org.eyeseetea.malariacare.domain.entity.SurveyAnsweredRatio;
 import org.eyeseetea.malariacare.data.database.utils.planning.SurveyPlanner;
+import org.eyeseetea.malariacare.data.repositories.SurveyAnsweredRatioRepository;
+import org.eyeseetea.malariacare.domain.boundary.executors.IAsyncExecutor;
+import org.eyeseetea.malariacare.domain.boundary.executors.IMainExecutor;
+import org.eyeseetea.malariacare.domain.boundary.repositories.ISurveyAnsweredRatioRepository;
+import org.eyeseetea.malariacare.domain.entity.SurveyAnsweredRatio;
 import org.eyeseetea.malariacare.domain.usecase.GetSurveyAnsweredRatioUseCase;
-import org.eyeseetea.malariacare.domain.utils.Action;
+import org.eyeseetea.malariacare.domain.usecase.ISurveyAnsweredRatioCallback;
+import org.eyeseetea.malariacare.domain.usecase.SaveSurveyAnsweredRatioUseCase;
 import org.eyeseetea.malariacare.fragments.CreateSurveyFragment;
 import org.eyeseetea.malariacare.fragments.DashboardUnsentFragment;
 import org.eyeseetea.malariacare.fragments.SurveyFragment;
 import org.eyeseetea.malariacare.layout.dashboard.config.DashboardOrientation;
 import org.eyeseetea.malariacare.layout.dashboard.config.ModuleSettings;
 import org.eyeseetea.malariacare.layout.utils.LayoutUtils;
+import org.eyeseetea.malariacare.presentation.executors.AsyncExecutor;
+import org.eyeseetea.malariacare.presentation.executors.UIThreadExecutor;
 import org.eyeseetea.malariacare.utils.Constants;
 import org.eyeseetea.malariacare.views.CustomTextView;
+import org.eyeseetea.malariacare.views.DoublePieChart;
+import org.eyeseetea.malariacare.views.SurveyDialog;
+import org.eyeseetea.malariacare.views.filters.OrgUnitProgramFilterView;
 
 /**
  * Created by idelcano on 25/02/2016.
@@ -54,10 +67,30 @@ public class AssessModuleController extends ModuleController {
 
     CreateSurveyFragment createSurveyFragment;
 
+    OrgUnitProgramFilterView orgUnitProgramFilterView;
+
+    SaveSurveyAnsweredRatioUseCase saveSurveyAnsweredRatioUseCase;
+    GetSurveyAnsweredRatioUseCase getSurveyAnsweredRatioUseCase;
+
     public AssessModuleController(ModuleSettings moduleSettings) {
         super(moduleSettings);
         this.tabLayout = R.id.tab_assess_layout;
         this.idVerticalTitle = R.id.titleInProgress;
+
+        initializeDependencies();
+    }
+
+    private void initializeDependencies() {
+        ISurveyAnsweredRatioRepository surveyAnsweredRatioRepository =
+                new SurveyAnsweredRatioRepository();
+        IAsyncExecutor asyncExecutor = new AsyncExecutor();
+        IMainExecutor mainExecutor = new UIThreadExecutor();
+
+        saveSurveyAnsweredRatioUseCase = new SaveSurveyAnsweredRatioUseCase(
+                surveyAnsweredRatioRepository, mainExecutor, asyncExecutor);
+
+        getSurveyAnsweredRatioUseCase = new GetSurveyAnsweredRatioUseCase(
+                surveyAnsweredRatioRepository, mainExecutor, asyncExecutor);
     }
 
     public static String getSimpleName() {
@@ -68,6 +101,13 @@ public class AssessModuleController extends ModuleController {
     public void init(DashboardActivity activity) {
         super.init(activity);
         fragment = new DashboardUnsentFragment();
+
+        orgUnitProgramFilterView =
+                (OrgUnitProgramFilterView) dashboardActivity.findViewById(
+                        R.id.assess_org_unit_program_filter_view);
+
+        orgUnitProgramFilterView.setVisibility(View.VISIBLE);
+
     }
 
     /**
@@ -80,14 +120,57 @@ public class AssessModuleController extends ModuleController {
             return;
         }
 
-        Survey survey = Session.getSurveyByModule(getSimpleName());
+        final SurveyDB survey = Session.getSurveyByModule(getSimpleName());
         if (survey.isCompleted() || survey.isSent()) {
             dashboardController.setNavigatingBackwards(false);
             closeSurveyFragment();
             return;
         }
-        new AsyncOnCloseSurveyFragment(surveyFragment, survey, Action.CHANGE_TAB).execute();
 
+        surveyFragment.showProgress();
+        closeSurveyFragment(survey, org.eyeseetea.malariacare.domain
+                .utils.Action.CHANGE_TAB);
+    }
+
+    private void closeSurveyFragment(final SurveyDB survey,
+            final org.eyeseetea.malariacare.domain.utils.Action action) {
+        getSurveyAnsweredRatioUseCase.execute(survey.getId_survey(),
+                new ISurveyAnsweredRatioCallback() {
+                    @Override
+                    public void nextProgressMessage() {
+                        surveyFragment.nextProgressMessage();
+                    }
+
+                    @Override
+                    public void onComplete(SurveyAnsweredRatio surveyAnsweredRatio) {
+                        if (action.equals(
+                                org.eyeseetea.malariacare.domain.utils.Action.PRESS_BACK_BUTTON)) {
+                            surveyFragment.hideProgress();
+                            boolean isDialogShown = onSurveyBackPressed(surveyAnsweredRatio);
+                            if (!isDialogShown) {
+                                //Confirm closing
+                                if (survey.isCompleted() || survey.isSent()) {
+                                    dashboardController.setNavigatingBackwards(false);
+                                    surveyFragment.hideProgress();
+                                    closeSurveyFragment();
+                                    return;
+                                } else {
+                                    askToCloseSurvey();
+                                }
+                            }
+                        } else if (action.equals(
+                                org.eyeseetea.malariacare.domain.utils.Action.CHANGE_TAB)) {
+                            if (surveyAnsweredRatio.getCompulsoryAnswered()
+                                    == surveyAnsweredRatio.getTotalCompulsory()
+                                    && surveyAnsweredRatio.getTotalCompulsory() != 0) {
+                                askToSendCompulsoryCompletedSurvey();
+                            }
+                            surveyFragment.hideProgress();
+                            closeSurveyFragment();
+
+                        }
+                    }
+                });
     }
 
     public void onBackPressed() {
@@ -110,13 +193,14 @@ public class AssessModuleController extends ModuleController {
         }
 
         surveyFragment.showProgress();
-        surveyFragment.nextProgressMessage();
-        final Survey survey = Session.getSurveyByModule(getSimpleName());
-        new AsyncOnCloseSurveyFragment(surveyFragment, survey, Action.PRESS_BACK_BUTTON).execute();
+        final SurveyDB survey = Session.getSurveyByModule(getSimpleName());
+
+        closeSurveyFragment(survey, org.eyeseetea.malariacare.domain
+                .utils.Action.PRESS_BACK_BUTTON);
         //if the survey is opened in review mode exit.
     }
 
-    public void onSurveySelected(Survey survey) {
+    public void onSurveySelected(SurveyDB survey) {
 
         Session.setSurveyByModule(survey, getSimpleName());
 
@@ -133,21 +217,96 @@ public class AssessModuleController extends ModuleController {
             dashboardActivity.prepareLocationListener(survey);
         }
         //Prepare survey fragment
-        surveyFragment = SurveyFragment.newInstance(1);
+        surveyFragment = new SurveyFragment();
+
+
 
         surveyFragment.setModuleName(getSimpleName());
         replaceFragment(R.id.dashboard_details_container, surveyFragment);
-        LayoutUtils.setActionBarTitleForSurvey(dashboardActivity, survey);
+        orgUnitProgramFilterView.setVisibility(View.GONE);
+
+        final SurveyDB finalSurvey = survey;
+        getSurveyAnsweredRatioUseCase.execute(survey.getId_survey(),
+                new ISurveyAnsweredRatioCallback() {
+                    @Override
+                    public void nextProgressMessage() {
+
+                    }
+
+                    @Override
+                    public void onComplete(SurveyAnsweredRatio surveyAnsweredRatio) {
+                        saveSurveyAnsweredRatioUseCase.execute(
+                                new ISurveyAnsweredRatioCallback() {
+                                    @Override
+                                    public void nextProgressMessage() {
+                                        Log.d(getClass().getName(), "nextProgressMessage");
+                                        surveyFragment.nextProgressMessage();
+                                    }
+
+                                    @Override
+                                    public void onComplete(
+                                            SurveyAnsweredRatio surveyAnsweredRatio) {
+                                        Log.d(getClass().getName(), "onComplete");
+                                        if (surveyAnsweredRatio != null) {
+                                            LayoutUtils.setActionBarTitleForSurveyAndChart(
+                                                    dashboardActivity, finalSurvey, getTitle(),
+                                                    surveyAnsweredRatio);
+
+                                            initializeStatusChart();
+                                        }
+                                    }
+                                }, surveyAnsweredRatio);
+                    }
+                });
     }
 
-    public void onMarkAsCompleted(final Survey survey) {
-        GetSurveyAnsweredRatioUseCase getSurveyAnsweredRatioUseCase = new GetSurveyAnsweredRatioUseCase();
+    private void initializeStatusChart() {
+        DoublePieChart doublePieChart =
+                (DoublePieChart) DashboardActivity.dashboardActivity.getSupportActionBar
+                        ().getCustomView().findViewById(
+                        R.id.action_bar_chart);
+
+        doublePieChart.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View view) {
+
+                final SurveyDB survey = Session.getSurveyByModule(getSimpleName());
+
+                getSurveyAnsweredRatioUseCase.execute(survey.getId_survey(),
+                        new ISurveyAnsweredRatioCallback() {
+                            @Override
+                            public void nextProgressMessage() {
+                            }
+
+                            @Override
+                            public void onComplete(SurveyAnsweredRatio surveyAnsweredRatio) {
+                                SurveyDialog.Builder builder = SurveyDialog.newBuilder(
+                                        dashboardActivity, survey);
+
+                                final View.OnClickListener completeButtonListener =
+                                        new View.OnClickListener() {
+                                            @Override
+                                            public void onClick(View v) {
+                                                onMarkAsCompleted(survey);
+                                            }
+                                        };
+
+                                builder.completeButton(completeButtonListener, surveyAnsweredRatio.isCompulsoryCompleted())
+                                        .bodyTextID(R.string.dialog_pie_chart_label_explanation)
+                                        .build();
+                            }
+                        });
+            }
+        });
+    }
+
+    public void onMarkAsCompleted(final SurveyDB survey) {
         getSurveyAnsweredRatioUseCase.execute(survey.getId_survey(),
-                GetSurveyAnsweredRatioUseCase.RecoveryFrom.DATABASE,
-                new GetSurveyAnsweredRatioUseCase.Callback() {
+                new ISurveyAnsweredRatioCallback() {
                     @Override
                     public void nextProgressMessage() {
                     }
+
                     @Override
                     public void onComplete(SurveyAnsweredRatio surveyAnsweredRatio) {
                         //This cannot be mark as completed
@@ -170,8 +329,9 @@ public class AssessModuleController extends ModuleController {
         }
 
         if (createSurveyFragment == null) {
-            createSurveyFragment = CreateSurveyFragment.newInstance(1);
+            createSurveyFragment = new CreateSurveyFragment();
         }
+        orgUnitProgramFilterView.setVisibility(View.GONE);
         replaceFragment(getLayout(), createSurveyFragment);
     }
 
@@ -189,25 +349,7 @@ public class AssessModuleController extends ModuleController {
     }
 
     public void setActionBarDashboard() {
-        if (!isFragmentActive(SurveyFragment.class)) {
-            super.setActionBarDashboard();
-            return;
-        }
-
-        //In survey -> custom action bar
-        Survey survey = Session.getSurveyByModule(getSimpleName());
-        String appNameColorString = LayoutUtils.getAppNameColorString();
-        String title = getActionBarTitleBySurvey(survey);
-        String subtitle = getActionBarSubTitleBySurvey(survey);
-
-        if (PreferencesState.getInstance().isVerticalDashboard()) {
-            LayoutUtils.setActionbarVerticalSurvey(dashboardActivity, title, subtitle);
-        } else {
-            Spanned spannedTitle = Html.fromHtml(
-                    String.format("<font color=\"#%s\"><b>%s</b></font>", appNameColorString,
-                            title));
-            LayoutUtils.setActionbarTitle(dashboardActivity, spannedTitle, subtitle);
-        }
+        super.setActionBarDashboard();
     }
 
     /**
@@ -247,23 +389,6 @@ public class AssessModuleController extends ModuleController {
                 .setMessage(R.string.survey_info_exit).setPositiveButton(android.R.string.yes,
                 new DialogInterface.OnClickListener() {
                     public void onClick(DialogInterface dialog, int arg1) {
-                        final Survey survey = Session.getSurveyByModule(getSimpleName());
-
-                        GetSurveyAnsweredRatioUseCase getSurveyAnsweredRatioUseCase = new GetSurveyAnsweredRatioUseCase();
-                        getSurveyAnsweredRatioUseCase.execute(survey.getId_survey(),
-                                GetSurveyAnsweredRatioUseCase.RecoveryFrom.MEMORY_FIRST,
-                                new GetSurveyAnsweredRatioUseCase.Callback() {
-                                    @Override
-                                    public void nextProgressMessage() {
-                                        Log.d(getClass().getName(), "nextProgressMessage");
-                                    }
-
-                                    @Override
-                                    public void onComplete(SurveyAnsweredRatio surveyAnsweredRatio) {
-                                        Survey dbSurvey = Survey.findById(survey.getId_survey());
-                                        dbSurvey.updateSurveyStatus(surveyAnsweredRatio);
-                                    }
-                                });
                         dashboardController.setNavigatingBackwards(true);
                         closeSurveyFragment();
                         dashboardController.setNavigatingBackwards(false);
@@ -286,16 +411,7 @@ public class AssessModuleController extends ModuleController {
                 .setNegativeButton(android.R.string.no, null)
                 .setPositiveButton(android.R.string.yes, new DialogInterface.OnClickListener() {
                     public void onClick(DialogInterface dialog, int arg1) {
-                        Survey survey = Session.getSurveyByModule(getSimpleName());
-                        survey.setCompleteSurveyState(getSimpleName());
-                        alertOnComplete(survey);
-                        dashboardController.setNavigatingBackwards(true);
-                        closeSurveyFragment();
-                        if (DashboardOrientation.VERTICAL.equals(
-                                dashboardController.getOrientation())) {
-                            dashboardController.reloadVertical();
-                        }
-                        dashboardController.setNavigatingBackwards(false);
+                        completeAndCloseSurvey();
                     }
                 }).create().show();
     }
@@ -329,22 +445,14 @@ public class AssessModuleController extends ModuleController {
                 .create().show();
     }
 
-    private void alertAreYouSureYouWantToComplete(final Survey survey) {
+    private void alertAreYouSureYouWantToComplete(final SurveyDB survey) {
         new AlertDialog.Builder(dashboardActivity)
                 .setTitle(null)
                 .setMessage(String.format(dashboardActivity.getResources().getString(
                         R.string.dialog_info_ask_for_completion), survey.getProgram().getName()))
                 .setPositiveButton(android.R.string.ok, new DialogInterface.OnClickListener() {
                     public void onClick(DialogInterface arg0, int arg1) {
-                        //Change state
-                        survey.setCompleteSurveyState(getSimpleName());
-                        if (!survey.isInProgress()) {
-                            alertOnCompleteGoToFeedback(survey);
-                        }
-                        //Remove from list
-                        ((DashboardUnsentFragment) fragment).removeSurveyFromAdapter(survey);
-                        //Reload sent surveys
-                        ((DashboardUnsentFragment) fragment).reloadToSend();
+                        completeAndCloseSurvey();
                     }
                 })
                 .setNegativeButton(R.string.cancel, null)
@@ -352,7 +460,24 @@ public class AssessModuleController extends ModuleController {
                 .create().show();
     }
 
-    private void alertOnComplete(Survey survey) {
+    private void completeAndCloseSurvey() {
+        SurveyDB survey = Session.getSurveyByModule(getSimpleName());
+        survey.setCompleteSurveyState(getSimpleName());
+
+        if (!survey.isInProgress()) {
+            alertOnCompleteGoToFeedback(survey);
+        }
+
+        dashboardController.setNavigatingBackwards(true);
+        closeSurveyFragment();
+        if (DashboardOrientation.VERTICAL.equals(
+                dashboardController.getOrientation())) {
+            dashboardController.reloadVertical();
+        }
+        dashboardController.setNavigatingBackwards(false);
+    }
+
+    private void alertOnComplete(SurveyDB survey) {
         new AlertDialog.Builder(dashboardActivity)
                 .setTitle(null)
                 .setMessage(String.format(dashboardActivity.getResources().getString(
@@ -362,7 +487,7 @@ public class AssessModuleController extends ModuleController {
                 .create().show();
     }
 
-    public void alertOnCompleteGoToFeedback(final Survey survey) {
+    public void alertOnCompleteGoToFeedback(final SurveyDB survey) {
         new AlertDialog.Builder(dashboardActivity)
                 .setTitle(null)
                 .setMessage(String.format(dashboardActivity.getResources().getString(
@@ -372,7 +497,7 @@ public class AssessModuleController extends ModuleController {
                         new DialogInterface.OnClickListener() {
                             public void onClick(DialogInterface arg0, int arg1) {
                                 //Move to feedbackfragment
-                                dashboardActivity.onFeedbackSelected(survey);
+                                dashboardActivity.openFeedback(survey, true);
                             }
                         })
                 .setCancelable(true)
@@ -384,75 +509,58 @@ public class AssessModuleController extends ModuleController {
                 R.id.dashboard_details_container);
     }
 
-    public class AsyncOnCloseSurveyFragment extends AsyncTask<Void, Integer, SurveyAnsweredRatio> {
-        SurveyAnsweredRatio mSurveyAnsweredRatio;
-        SurveyFragment surveyFragment;
-        Survey survey;
-        Action action;
+    public AlertDialog assessModelDialog(@NonNull final SurveyDB survey) {
 
-        public AsyncOnCloseSurveyFragment(SurveyFragment surveyFragment, Survey survey, Action action) {
-            this.surveyFragment = surveyFragment;
-            this.survey = survey;
-            this.action = action;
-        }
+        SurveyDialog.Builder builder = SurveyDialog.newBuilder(dashboardActivity, survey);
 
-        @Override
-        protected void onPreExecute() {
-            super.onPreExecute();
-            //spinner
-            surveyFragment.showProgress();
-            surveyFragment.nextProgressMessage();
-        }
+        final View.OnClickListener editButtonListener = new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                onSurveySelected(survey);
+            }
+        };
 
+        final View.OnClickListener completeButtonListener = new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                onMarkAsCompleted(survey);
+            }
+        };
 
-        @Override
-        protected SurveyAnsweredRatio doInBackground(Void... voids) {
-            GetSurveyAnsweredRatioUseCase getSurveyAnsweredRatioUseCase = new GetSurveyAnsweredRatioUseCase();
-            getSurveyAnsweredRatioUseCase.execute(survey.getId_survey(),
-                    GetSurveyAnsweredRatioUseCase.RecoveryFrom.DATABASE,
-                    new GetSurveyAnsweredRatioUseCase.Callback() {
-                        @Override
-                        public void nextProgressMessage() {
-                            surveyFragment.nextProgressMessage();
-                        }
+        final View.OnClickListener deleteButtonListener = new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                //this method create a new survey getting the getScheduledDate date of the
+                // oldsurvey, and remove it.
+                SurveyPlanner.getInstance().deleteSurveyAndBuildNext(survey);
+                DashboardActivity.reloadDashboard();
+            }
+        };
 
-                        @Override
-                        public void onComplete(SurveyAnsweredRatio surveyAnsweredRatio) {
-                            mSurveyAnsweredRatio = surveyAnsweredRatio;
-                        }
-                    });
-            return mSurveyAnsweredRatio;
-        }
+        final SurveyDialog surveyDialog =  builder.editButton(editButtonListener)
+                .completeButton(completeButtonListener, true)
+                .deleteButton(deleteButtonListener)
+                .build();
 
-        @Override
-        protected void onPostExecute(SurveyAnsweredRatio surveyAnsweredRatio) {
-            if(action.equals(Action.PRESS_BACK_BUTTON)) {
-                surveyFragment.hideProgress();
-                boolean isDialogShown = onSurveyBackPressed(surveyAnsweredRatio);
-                if(!isDialogShown){
-                    //Confirm closing
-                    if (survey.isCompleted() || survey.isSent()) {
-                        dashboardController.setNavigatingBackwards(false);
-                        surveyFragment.hideProgress();
-                        closeSurveyFragment();
-                        return;
-                    }else{
-                        askToCloseSurvey();
+        getSurveyAnsweredRatioUseCase.execute(survey.getId_survey(),
+                new ISurveyAnsweredRatioCallback() {
+                    @Override
+                    public void nextProgressMessage() {
+
                     }
-                }
-            }
-            else if (action.equals(Action.CHANGE_TAB)){
-                super.onPostExecute(surveyAnsweredRatio);
-                if (surveyAnsweredRatio.getCompulsoryAnswered()
-                        == surveyAnsweredRatio.getTotalCompulsory()
-                        && surveyAnsweredRatio.getTotalCompulsory() != 0) {
-                    askToSendCompulsoryCompletedSurvey();
-                }
-                surveyFragment.hideProgress();
-                closeSurveyFragment();
 
-            }
-        }
+                    @Override
+                    public void onComplete(SurveyAnsweredRatio surveyAnsweredRatio) {
+                        boolean isCompulsoryCompleted = surveyAnsweredRatio.isCompulsoryCompleted();
+                        Button button = surveyDialog.getMarkCompleteButton();
+
+                        if(!isCompulsoryCompleted) {
+                            button.getBackground().setColorFilter(Color.GRAY, PorterDuff.Mode.SRC_IN);
+                            button.setEnabled(false);
+                        }
+                    }
+                });
+
+        return surveyDialog;
     }
-
 }

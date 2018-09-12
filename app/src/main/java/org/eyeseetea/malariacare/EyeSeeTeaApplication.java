@@ -25,14 +25,18 @@ import android.content.Context;
 import android.content.SharedPreferences;
 import android.preference.PreferenceManager;
 import android.support.multidex.MultiDex;
+import android.support.v7.app.AppCompatDelegate;
 
 import com.crashlytics.android.Crashlytics;
+import com.github.stkent.bugshaker.BugShaker;
+import com.github.stkent.bugshaker.flow.dialog.AlertDialogType;
+import com.github.stkent.bugshaker.github.GitHubConfiguration;
 import com.raizlabs.android.dbflow.config.EyeSeeTeaGeneratedDatabaseHolder;
 import com.raizlabs.android.dbflow.config.FlowConfig;
 import com.raizlabs.android.dbflow.config.FlowLog;
 import com.raizlabs.android.dbflow.config.FlowManager;
 
-import org.eyeseetea.malariacare.data.database.model.User;
+import org.eyeseetea.malariacare.data.database.model.UserDB;
 import org.eyeseetea.malariacare.data.database.utils.LocationMemory;
 import org.eyeseetea.malariacare.data.database.utils.PreferencesState;
 import org.eyeseetea.malariacare.layout.dashboard.builder.AppSettingsBuilder;
@@ -46,6 +50,10 @@ import io.fabric.sdk.android.Fabric;
 public class EyeSeeTeaApplication extends Application {
 
     public static Permissions permissions;
+
+    static {
+        AppCompatDelegate.setCompatVectorFromResourcesEnabled(true);
+    }
 
     @Override
     public void onCreate() {
@@ -74,6 +82,7 @@ public class EyeSeeTeaApplication extends Application {
 
         // Create indexes to accelerate the DB selects and avoid SQlite errors
         createDBIndexes();
+        initBugShaker();
     }
 
     @Override
@@ -85,7 +94,7 @@ public class EyeSeeTeaApplication extends Application {
 
     public Class<? extends Activity> getMainActivity() {
         SharedPreferences sharedPreferences = PreferenceManager.getDefaultSharedPreferences(this);
-        if (User.getLoggedUser() != null && sharedPreferences.getBoolean(
+        if (UserDB.getLoggedUser() != null && sharedPreferences.getBoolean(
                 getApplicationContext().getResources().getString(R.string.pull_metadata), false)) {
             return new DashboardActivity().getClass();
         } else if (!ProgressActivity.PULL_CANCEL) {
@@ -131,5 +140,19 @@ public class EyeSeeTeaApplication extends Application {
     protected void attachBaseContext(Context base) {
         super.attachBaseContext(base);
         MultiDex.install(this);
+    }
+
+    private void initBugShaker() {
+        BugShaker.get(this)
+                .setEmailAddresses("someone@example.com")
+                .setLoggingEnabled(BuildConfig.DEBUG)
+                .setAlertDialogType(AlertDialogType.APP_COMPAT)
+                .setGitHubInfo(new GitHubConfiguration(
+                        "eyeseetea/malariapp",
+                        BuildConfig.GIT_HUB_BOT_TOKEN,
+                        "eyeseeteabottest/snapshots",
+                        "master"))
+                .assemble()
+                .start();
     }
 }

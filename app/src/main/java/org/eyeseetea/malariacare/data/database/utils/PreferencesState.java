@@ -19,9 +19,10 @@
 
 package org.eyeseetea.malariacare.data.database.utils;
 
+import static org.eyeseetea.malariacare.utils.Constants.SYSTEM_DEFINED_LANGUAGE;
+
 import android.content.Context;
 import android.content.SharedPreferences;
-import android.content.res.Configuration;
 import android.content.res.Resources;
 import android.os.Build;
 import android.preference.PreferenceManager;
@@ -31,6 +32,7 @@ import android.util.Log;
 import org.eyeseetea.malariacare.DashboardActivity;
 import org.eyeseetea.malariacare.ProgressActivity;
 import org.eyeseetea.malariacare.R;
+import org.eyeseetea.malariacare.domain.entity.Credentials;
 import org.eyeseetea.malariacare.layout.dashboard.builder.AppSettingsBuilder;
 import org.eyeseetea.malariacare.layout.dashboard.config.DashboardListFilter;
 import org.eyeseetea.malariacare.layout.dashboard.config.DashboardOrientation;
@@ -82,6 +84,10 @@ public class PreferencesState {
      */
     private int maxEvents;
     /**
+     * Sets the monitoring target of events
+     */
+    private int monitoringTarget;
+    /**
      * Active language code;
      */
     private static String languageCode;
@@ -91,7 +97,7 @@ public class PreferencesState {
      */
     private boolean userAccept;
     private String serverUrl;
-    private String phoneLanguage;
+    private Credentials creedentials;
 
     private PreferencesState() {
     }
@@ -103,8 +109,11 @@ public class PreferencesState {
         return instance;
     }
 
+    public void setContext(Context context) {
+        this.context = context;
+    }
+
     public void init(Context context) {
-        phoneLanguage = Locale.getDefault().getLanguage();
         this.context = context;
         scaleDimensionsMap = initScaleDimensionsMap();
         reloadPreferences();
@@ -119,22 +128,33 @@ public class PreferencesState {
         locationRequired = initLocationRequired();
         hidePlanningTab = initHidePlanningTab();
         maxEvents = initMaxEvents();
+        monitoringTarget = initMonitoringTarget();
         languageCode = initLanguageCode();
         userAccept = initUserAccept();
         Log.d(TAG, String.format(
                 "reloadPreferences: scale: %s | locationRequired: %b | "
-                        + "maxEvents: %d | largeTextOption: %b ",
-                scale, locationRequired, maxEvents, showLargeText));
+                        + "maxEvents: %d | largeTextOption: %b  | target: %d",
+                scale, locationRequired, maxEvents, showLargeText, monitoringTarget));
     }
 
     /**
      * Returns 'language code' from sharedPreferences
      */
     private String initLanguageCode() {
+        String languagePreferenceKey = instance.getContext().getString(R.string.language_code);
+
         SharedPreferences sharedPreferences = PreferenceManager.getDefaultSharedPreferences(
                 instance.getContext());
-        return sharedPreferences.getString(instance.getContext().getString(R.string.language_code),
-                "");
+
+        String languageCode = sharedPreferences.getString(languagePreferenceKey,"");
+
+        if(languageCode.isEmpty()) {
+            languageCode = SYSTEM_DEFINED_LANGUAGE;
+
+            putStringOnPreferences(sharedPreferences, languagePreferenceKey, languageCode);
+        }
+
+        return languageCode;
     }
 
     /**
@@ -201,6 +221,18 @@ public class PreferencesState {
         String maxValue = sharedPreferences.getString(
                 instance.getContext().getString(R.string.dhis_max_items),
                 instance.getContext().getString(R.string.dhis_default_max_items));
+        return Integer.valueOf(maxValue);
+    }
+
+    /**
+     * Inits target settings
+     */
+    private int initMonitoringTarget() {
+        SharedPreferences sharedPreferences = PreferenceManager.getDefaultSharedPreferences(
+                instance.getContext());
+        String maxValue = sharedPreferences.getString(
+                instance.getContext().getString(R.string.monitoring_target),
+                instance.getContext().getString(R.string.default_monitoring_target));
         return Integer.valueOf(maxValue);
     }
 
@@ -280,6 +312,14 @@ public class PreferencesState {
 
     public void setMaxEvents(int maxEvents) {
         this.maxEvents = maxEvents;
+    }
+
+    public int getMonitoringTarget() {
+        return monitoringTarget;
+    }
+
+    public void setMonitoringTarget(int monitoringTarget) {
+        this.monitoringTarget = monitoringTarget;
     }
 
     public Float getFontSize(String scale, String dimension) {
@@ -402,18 +442,26 @@ public class PreferencesState {
     }
 
     public void loadsLanguageInActivity() {
+        setLocale(getCurrentLocale());
+    }
+
+    public String getCurrentLocale() {
         String temLanguageCode = languageCode;
-        if (languageCode.equals("")) {
-            temLanguageCode = phoneLanguage;
+        if (languageCode.equals(SYSTEM_DEFINED_LANGUAGE)) {
+            temLanguageCode = getPhoneLanguage();
         }
+        return temLanguageCode;
+    }
+
+    private void setLocale(String languageCode) {
         Resources res = context.getResources();
         // Change locale settings in the app.
         DisplayMetrics dm = res.getDisplayMetrics();
-        Configuration conf = res.getConfiguration();
+        android.content.res.Configuration conf = res.getConfiguration();
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.JELLY_BEAN_MR1) {
-            conf.setLocale(new Locale(temLanguageCode));
+            conf.setLocale(new Locale(languageCode));
         } else {
-            conf.locale = new Locale(temLanguageCode);
+            conf.locale = new Locale(languageCode);
         }
         if (Build.VERSION.SDK_INT < Build.VERSION_CODES.N) {
             res.updateConfiguration(conf, dm);
@@ -442,7 +490,73 @@ public class PreferencesState {
                         R.string.dhis_url), "");
     }
 
-    public String getPhoneLanguage() {
-        return phoneLanguage;
+    private String getPhoneLanguage() {
+        Locale locale;
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) {
+            locale = Resources.getSystem().getConfiguration().getLocales().get(0);
+        } else {
+            //noinspection deprecation
+            locale = Resources.getSystem().getConfiguration().locale;
+        }
+        //Taking only the 2 first elements of the string, for e.g en_US => en, fr_CA => fr..etc.
+        return locale.getLanguage().substring(0, 2);
+    }
+
+    public Credentials getCreedentials() {
+        if(creedentials == null) {
+                    SharedPreferences sharedPreferences = PreferenceManager.getDefaultSharedPreferences(
+                    context);
+            String url= sharedPreferences.getString(
+                    context.getResources().getString(R.string.dhis_url), "");
+            String name =
+                    sharedPreferences.getString(context.getString(R.string.dhis_user), "");
+            String password =
+                    sharedPreferences.getString(context.getString(R.string.dhis_password), "");
+            creedentials = new Credentials(url, name, password);
+        }
+        return creedentials;
+    }
+
+    public String getProgramUidFilter() {
+
+        SharedPreferences sharedPreferences = PreferenceManager.getDefaultSharedPreferences(
+                instance.getContext());
+
+        return sharedPreferences.getString(
+                instance.getContext().getString(R.string.user_preference_program_filter), "");
+    }
+
+    public void setProgramUidFilter(String programUid) {
+        Log.d(TAG, "change user_preference_program_filter to "+ programUid);
+        SharedPreferences sharedPreferences = PreferenceManager.getDefaultSharedPreferences(
+                context);
+        SharedPreferences.Editor editor = sharedPreferences.edit();
+        editor.putString(context.getResources().getString(R.string.user_preference_program_filter), programUid);
+        editor.commit();
+    }
+
+    public String getOrgUnitUidFilter() {
+        SharedPreferences sharedPreferences = PreferenceManager.getDefaultSharedPreferences(
+                instance.getContext());
+
+        return sharedPreferences.getString(
+                instance.getContext().getString(R.string.user_preference_org_unit_filter), "");
+    }
+
+    public void setOrgUnitUidFilter(String orgUnitUid) {
+        Log.d(TAG, "change user_preference_org_unit_filter to "+ orgUnitUid);
+        SharedPreferences sharedPreferences = PreferenceManager.getDefaultSharedPreferences(
+                context);
+        SharedPreferences.Editor editor = sharedPreferences.edit();
+        editor.putString(context.getResources().getString(R.string.user_preference_org_unit_filter), orgUnitUid);
+        editor.commit();
+    }
+
+    private void putStringOnPreferences(SharedPreferences sharedPreferences, String languagePreferenceKey,
+            String languageCode) {
+
+        SharedPreferences.Editor editor = sharedPreferences.edit();
+        editor.putString(languagePreferenceKey,languageCode);
+        editor.apply();
     }
 }

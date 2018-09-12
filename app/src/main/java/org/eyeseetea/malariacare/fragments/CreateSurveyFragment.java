@@ -19,7 +19,6 @@
 
 package org.eyeseetea.malariacare.fragments;
 
-import android.app.Activity;
 import android.app.AlertDialog;
 import android.app.Fragment;
 import android.content.BroadcastReceiver;
@@ -27,8 +26,6 @@ import android.content.Context;
 import android.content.Intent;
 import android.content.IntentFilter;
 import android.content.SharedPreferences;
-import android.location.Location;
-import android.location.LocationManager;
 import android.os.Bundle;
 import android.preference.PreferenceManager;
 import android.support.v4.content.LocalBroadcastManager;
@@ -40,15 +37,15 @@ import android.widget.AdapterView;
 import android.widget.LinearLayout;
 import android.widget.Spinner;
 
+import org.eyeseetea.malariacare.BuildConfig;
 import org.eyeseetea.malariacare.DashboardActivity;
 import org.eyeseetea.malariacare.R;
-import org.eyeseetea.malariacare.data.database.model.OrgUnit;
-import org.eyeseetea.malariacare.data.database.model.OrgUnitLevel;
-import org.eyeseetea.malariacare.data.database.model.Program;
-import org.eyeseetea.malariacare.data.database.model.Survey;
+import org.eyeseetea.malariacare.data.database.model.OrgUnitDB;
+import org.eyeseetea.malariacare.data.database.model.OrgUnitLevelDB;
+import org.eyeseetea.malariacare.data.database.model.ProgramDB;
+import org.eyeseetea.malariacare.data.database.model.SurveyDB;
 import org.eyeseetea.malariacare.data.database.utils.PreferencesState;
 import org.eyeseetea.malariacare.data.database.utils.Session;
-import org.eyeseetea.malariacare.data.database.utils.planning.SurveyPlanner;
 import org.eyeseetea.malariacare.data.database.utils.services.BaseServiceBundle;
 import org.eyeseetea.malariacare.layout.adapters.general.OrgUnitArrayAdapter;
 import org.eyeseetea.malariacare.layout.adapters.general.ProgramArrayAdapter;
@@ -56,16 +53,13 @@ import org.eyeseetea.malariacare.services.SurveyService;
 import org.eyeseetea.malariacare.utils.Constants;
 import org.eyeseetea.malariacare.views.CustomButton;
 import org.eyeseetea.malariacare.views.CustomTextView;
+import org.eyeseetea.malariacare.views.filters.OrgUnitProgramFilterView;
 
 import java.util.ArrayList;
-import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 
-/**
- * Created by ignac on 05/01/2016.
- */
 public class CreateSurveyFragment extends Fragment {
 
     private static String TAG = ".CreateSurveyFragment";
@@ -84,26 +78,26 @@ public class CreateSurveyFragment extends Fragment {
         public View component;
     }
 
-    private LinkedHashMap<OrgUnitLevel, View> orgUnitHierarchyView;
+    private LinkedHashMap<OrgUnitLevelDB, View> orgUnitHierarchyView;
 
     private SurveyReceiver surveyReceiver;
 
     private Spinner programView;
 
     //Loaded one time from service
-    List<Program> allProgramList;
-    List<OrgUnit> orgUnitList;
-    List<OrgUnitLevel> orgUnitLevelList;
+    List<ProgramDB> allProgramList;
+    List<OrgUnitDB> orgUnitList;
+    List<OrgUnitLevelDB> orgUnitLevelList;
 
-    private OrgUnit orgUnitDefaultOption;
-    private Program programDefaultOption;
+    private OrgUnitDB orgUnitDefaultOption;
+    private ProgramDB programDefaultOption;
 
     private OrgUnitHierarchy orgUnitHierarchy;
 
     private LayoutInflater lInflater;
     LinearLayout llLayout;
 
-    DashboardActivity dashboardActivity;
+    OrgUnitProgramFilterView filter;
 
     //Flag used to control the layout inflating is only in the creation of the fragment.
     private boolean loadHierarchy=true;
@@ -111,20 +105,11 @@ public class CreateSurveyFragment extends Fragment {
     public CreateSurveyFragment() {
     }
 
-    public static CreateSurveyFragment newInstance(int index) {
-        CreateSurveyFragment f = new CreateSurveyFragment();
-
-        // Supply index input as an argument.
-        Bundle args = new Bundle();
-        args.putInt("index", index);
-        f.setArguments(args);
-
-        return f;
-    }
-
     @Override
     public void onCreate(Bundle savedInstanceState){
         Log.d(TAG, "onCreate");
+        filter  = (OrgUnitProgramFilterView) DashboardActivity.dashboardActivity.findViewById(
+                R.id.assess_org_unit_program_filter_view);
         super.onCreate(savedInstanceState);
     }
     @Override
@@ -183,13 +168,13 @@ public class CreateSurveyFragment extends Fragment {
         this.lInflater = LayoutInflater.from(getActivity());
 
         //Create default options
-        orgUnitDefaultOption = new OrgUnit(Constants.DEFAULT_SELECT_OPTION);
-        programDefaultOption = new Program(Constants.DEFAULT_SELECT_OPTION);
+        orgUnitDefaultOption = new OrgUnitDB(Constants.DEFAULT_SELECT_OPTION);
+        programDefaultOption = new ProgramDB(Constants.DEFAULT_SELECT_OPTION);
 
         //Populate Organization Unit DDL
         ViewHolder viewHolder = new ViewHolder();
-        List <OrgUnit> orgUnitListFirstLevel=new ArrayList<>();
-        for(OrgUnit orgUnit:orgUnitList){
+        List <OrgUnitDB> orgUnitListFirstLevel=new ArrayList<>();
+        for(OrgUnitDB orgUnit:orgUnitList){
             if(orgUnitList.get(0).getOrgUnitLevel().equals(orgUnit.getOrgUnitLevel())) {
                 orgUnitListFirstLevel.add(orgUnit);
             }
@@ -202,9 +187,8 @@ public class CreateSurveyFragment extends Fragment {
         orgUnitView.setOnItemSelectedListener(new OrgUnitSpinnerListener(viewHolder));
 
         View childView = llLayout.findViewById(R.id.org_unit_container);
-        CustomTextView childViewTextView = (CustomTextView) childView.findViewById(R.id.textView2);
-        childViewTextView.setText(orgUnitListFirstLevel.get(1).getOrgUnitLevel().getName());
 
+        bindOUFacility(orgUnitListFirstLevel, childView);
 
         //Put in org unit hierarchy map
         orgUnitHierarchyView = new LinkedHashMap<>();
@@ -213,10 +197,10 @@ public class CreateSurveyFragment extends Fragment {
         //Prepare Organization Unit Item DDL
         orgUnitContainerItems = llLayout.findViewById(R.id.org_unit_container_items);
 
-        for (OrgUnitLevel orgUnitLevel : orgUnitLevelList) {
+        for (OrgUnitLevelDB orgUnitLevel : orgUnitLevelList) {
             if (!orgUnitLevel.equals(orgUnitListFirstLevel.get(1).getOrgUnitLevel())) {
                 childView = lInflater.inflate(R.layout.create_survey_org_unit_item_fragment, (LinearLayout) orgUnitContainerItems, false);
-                childViewTextView = (CustomTextView) childView.findViewById(R.id.textView);
+                CustomTextView childViewTextView = (CustomTextView) childView.findViewById(R.id.textView);
                 childViewTextView.setText(orgUnitLevel.getName());
 
                 Spinner childViewSpinner = (Spinner) childView.findViewById(R.id.org_unit_item_spinner);
@@ -230,30 +214,41 @@ public class CreateSurveyFragment extends Fragment {
 
         //Populate Program View DDL
         //get all the programs from a DB query only one time.
-        List<Program> initProgram=new ArrayList<>();
+        List<ProgramDB> initProgram=new ArrayList<>();
         initProgram.add(0, programDefaultOption);
         programView = (Spinner)  llLayout.findViewById(R.id.program);
         programView.setAdapter(new ProgramArrayAdapter( getActivity(), initProgram));
 
         //set the first orgUnit saved
-        if(orgUnitHierarchy.getSavedUidsList().length()>1) {
-            orgUnitStorage = orgUnitHierarchy.getSavedUidsList().split(TOKEN)[0];
-        }else{
-            orgUnitStorage="";
+
+
+        OrgUnitDB filteredOrgUnit = filter.getSelectedOrgUnitFilter();
+        if(filteredOrgUnit!=null) {
+            orgUnitStorage = filteredOrgUnit.getUid();
+        }else {
+            if (orgUnitHierarchy.getSavedUidsList().length() > 1) {
+                orgUnitStorage = orgUnitHierarchy.getSavedUidsList().split(TOKEN)[0];
+            } else {
+                orgUnitStorage = "";
+            }
         }
 
         //Load the root lastorgUnit/firstOrgUnit(if we have orgUnitLevels).
-        if(!orgUnitStorage.equals("")){
-            orgUnitView.setSelection(getIndex(orgUnitView, OrgUnit.getOrgUnit(orgUnitStorage).getName()));
+        if(orgUnitStorage!=null && !orgUnitStorage.equals("")){
+            orgUnitView.setSelection(getIndex(orgUnitView, OrgUnitDB.getOrgUnit(orgUnitStorage).getName()));
         }
         loadHierarchy=false;
     }
 
+    private void bindOUFacility(List<OrgUnitDB> orgUnitListFirstLevel, View childView) {
+        CustomTextView childViewTextView = (CustomTextView) childView.findViewById(
+                R.id.textView2);
 
-    @Override
-    public void onAttach(Activity activity) {
-        super.onAttach(activity);
-        dashboardActivity = (DashboardActivity) activity;
+        if(BuildConfig.OUSelectionHealthFacility) {
+            childViewTextView.setText(R.string.health_facility);
+        }else{
+            childViewTextView.setText(orgUnitListFirstLevel.get(1).getOrgUnitLevel().getName());
+        }
     }
 
     @Override
@@ -270,11 +265,11 @@ public class CreateSurveyFragment extends Fragment {
         for (int i=0;i<spinner.getCount();i++){
             Object objectRow= spinner.getItemAtPosition(i);
             String value="";
-            if(objectRow instanceof Program) {
-                value= ((Program) objectRow).getName();
+            if(objectRow instanceof ProgramDB) {
+                value= ((ProgramDB) objectRow).getName();
             }
-            if(objectRow instanceof OrgUnit) {
-                value= ((OrgUnit) objectRow).getName();
+            if(objectRow instanceof OrgUnitDB) {
+                value= ((OrgUnitDB) objectRow).getName();
             }
             if (value.equalsIgnoreCase(myString)){
                 index = i;
@@ -287,7 +282,7 @@ public class CreateSurveyFragment extends Fragment {
     private boolean isEverythingFilled() {
         try {
             boolean isEverythingFilled = (!programView.getSelectedItem().equals(programDefaultOption));
-            boolean isProgramInOrgUnit=orgUnitHierarchy.getLastSelected().getPrograms().contains((Program)programView.getSelectedItem());
+            boolean isProgramInOrgUnit=orgUnitHierarchy.getLastSelected().getPrograms().contains((ProgramDB)programView.getSelectedItem());
             return isEverythingFilled && isProgramInOrgUnit;
         }catch(NullPointerException ex){
             return false;
@@ -296,10 +291,10 @@ public class CreateSurveyFragment extends Fragment {
 
     private boolean doesSurveyInProgressExist() {
         // Read Selected Items
-        OrgUnit orgUnit = orgUnitHierarchy.getLastSelected();
-        Program program = (Program) programView.getSelectedItem();
+        OrgUnitDB orgUnit = orgUnitHierarchy.getLastSelected();
+        ProgramDB program = (ProgramDB) programView.getSelectedItem();
 
-        Survey survey = Survey.getInProgressSurveys(orgUnit, program);
+        SurveyDB survey = SurveyDB.getInProgressSurveys(orgUnit, program);
         return (survey != null);
     }
 
@@ -309,7 +304,7 @@ public class CreateSurveyFragment extends Fragment {
                     .setTitle( getActivity().getApplicationContext().getString(R.string.dialog_title_missing_selection))
                     .setMessage( getActivity().getApplicationContext().getString(R.string.dialog_content_missing_selection))
                     .setPositiveButton(android.R.string.ok, null).create().show();
-        } else if (!orgUnitHierarchy.getLastSelected().getPrograms().contains((Program) programView.getSelectedItem())) {
+        } else if (!orgUnitHierarchy.getLastSelected().getPrograms().contains((ProgramDB) programView.getSelectedItem())) {
             new AlertDialog.Builder( getActivity())
                     .setTitle(getActivity().getApplicationContext().getString(R.string.dialog_title_incorrect_org_unit))
                     .setMessage(getActivity().getApplicationContext().getString(R.string.dialog_content_incorrect_org_unit))
@@ -334,10 +329,10 @@ public class CreateSurveyFragment extends Fragment {
         Log.i(".CreateSurveyActivity", "Saving survey and saving in session");
 
         //Get selected orgUnit
-        OrgUnit orgUnit = orgUnitHierarchy.getLastSelected();
+        OrgUnitDB orgUnit = orgUnitHierarchy.getLastSelected();
 
         //Get selected program
-        Program program = (Program)programView.getSelectedItem();
+        ProgramDB program = (ProgramDB)programView.getSelectedItem();
 
 
         //save  the list of orgUnits
@@ -346,7 +341,7 @@ public class CreateSurveyFragment extends Fragment {
         //save the program in the preferents
         setLastSelectedProgram(program.getUid());
 
-        dashboardActivity.onCreateSurvey(orgUnit,program);
+        DashboardActivity.dashboardActivity.onCreateSurvey(orgUnit,program);
     }
 
     private class OrgUnitSpinnerListener implements AdapterView.OnItemSelectedListener {
@@ -360,16 +355,16 @@ public class CreateSurveyFragment extends Fragment {
         @Override
         public void onItemSelected(AdapterView<?> parent, View view, int pos, long id) {
 
-            OrgUnit selectedOrgUnit = (OrgUnit) ((Spinner)viewHolder.component).getItemAtPosition(1);
-            OrgUnitLevel selectedOrgUnitLevel=selectedOrgUnit.getOrgUnitLevel();
-            selectedOrgUnit = (OrgUnit) ((Spinner)viewHolder.component).getItemAtPosition(pos);
+            OrgUnitDB selectedOrgUnit = (OrgUnitDB) ((Spinner)viewHolder.component).getItemAtPosition(1);
+            OrgUnitLevelDB selectedOrgUnitLevel=selectedOrgUnit.getOrgUnitLevel();
+            selectedOrgUnit = (OrgUnitDB) ((Spinner)viewHolder.component).getItemAtPosition(pos);
 
             if(selectedOrgUnit.getUid()==null)
                 selectedOrgUnit.setOrgUnitLevel(selectedOrgUnitLevel);
 
 
             // Populate child view. If it exists in org unit map, grab it; otherwise inflate it
-            List<OrgUnit> orgUnitList = selectedOrgUnit.getChildrenOrderedByName();
+            List<OrgUnitDB> orgUnitList = selectedOrgUnit.getChildrenOrderedByName();
 
             orgUnitHierarchy.addOrgUnit(selectedOrgUnit);
             if(orgUnitHierarchy.getLastSelected()!=null)
@@ -408,7 +403,7 @@ public class CreateSurveyFragment extends Fragment {
                         for (int i = 0; i < list.length; i++) {
                             if (!list[i].equals("") && !list[i].equals(TOKEN)) {
                                 try {
-                                    OrgUnit selectOrgUnit=OrgUnit.getOrgUnit(list[i]);
+                                    OrgUnitDB selectOrgUnit= OrgUnitDB.getOrgUnit(list[i]);
                                     int index=getIndex(spinner, selectOrgUnit.getName());
                                     if(index!=0) {
                                         activeUid=selectOrgUnit.getUid();
@@ -435,7 +430,7 @@ public class CreateSurveyFragment extends Fragment {
             //If there is not any children, iterate over the org units spinners and hide non needed
             //FIXME This code is horrible. We need a more elegant way
             Boolean setInvisible = false;
-            for (Map.Entry<OrgUnitLevel, View> entry : orgUnitHierarchyView.entrySet()) {
+            for (Map.Entry<OrgUnitLevelDB, View> entry : orgUnitHierarchyView.entrySet()) {
                 if (setInvisible) {
                     View childView = entry.getValue();
                     ((Spinner) childView.findViewById(R.id.org_unit_item_spinner)).setSelection(0, click);
@@ -453,7 +448,7 @@ public class CreateSurveyFragment extends Fragment {
         }
     }
     //filter programs by orgUnit
-    private void refreshPrograms(OrgUnit selectedOrgUnit) {
+    private void refreshPrograms(OrgUnitDB selectedOrgUnit) {
         if(filterPrograms(selectedOrgUnit).size()<=1){
             View view = llLayout.findViewById(R.id.select_survey_view);
             view.setVisibility(View.GONE);
@@ -465,11 +460,11 @@ public class CreateSurveyFragment extends Fragment {
     }
 
     //filter programs by orgUnit
-    private List<Program> filterPrograms(OrgUnit selectedOrgUnit) {
+    private List<ProgramDB> filterPrograms(OrgUnitDB selectedOrgUnit) {
 
-        List<Program> initProgram= new ArrayList<>();
-        for(Program orgUnitProgram: selectedOrgUnit.getPrograms()){
-            for(Program program:allProgramList ){
+        List<ProgramDB> initProgram= new ArrayList<>();
+        for(ProgramDB orgUnitProgram: selectedOrgUnit.getPrograms()){
+            for(ProgramDB program:allProgramList ){
                 if(orgUnitProgram!=null && orgUnitProgram.equals(program))
                     initProgram.add(orgUnitProgram);
             }
@@ -477,9 +472,15 @@ public class CreateSurveyFragment extends Fragment {
         initProgram.add(0, programDefaultOption);
         programView = (Spinner)  llLayout.findViewById(R.id.program);
         programView.setAdapter(new ProgramArrayAdapter( getActivity(), initProgram));
-        Program lastSelectedProgram= getLastSelectedProgram();
-        if(lastSelectedProgram!=null){
-            programView.setSelection(getIndex(programView, lastSelectedProgram.getName()));
+        ProgramDB lastSelectedProgram= getLastSelectedProgram();
+
+        ProgramDB filteredProgram = filter.getSelectedProgramFilter();
+        if(filteredProgram!=null){
+            programView.setSelection(getIndex(programView, filteredProgram.getName()));
+        }else {
+            if (lastSelectedProgram != null) {
+                programView.setSelection(getIndex(programView, lastSelectedProgram.getName()));
+            }
         }
         return initProgram;
     }
@@ -506,9 +507,9 @@ public class CreateSurveyFragment extends Fragment {
     }
 
     //Gets the default program/
-    private Program getLastSelectedProgram() {
+    private ProgramDB getLastSelectedProgram() {
         SharedPreferences sharedPreferences = getSharedPreferences();
-        Program lastSelectedProgram = Program.getProgram(sharedPreferences.getString(getActivity().getApplicationContext().getResources().getString(R.string.default_program), ""));
+        ProgramDB lastSelectedProgram = ProgramDB.getProgram(sharedPreferences.getString(getActivity().getApplicationContext().getResources().getString(R.string.default_program), ""));
         return lastSelectedProgram;
     }
 
@@ -557,9 +558,9 @@ public class CreateSurveyFragment extends Fragment {
             if(loadHierarchy)
                 if (SurveyService.ALL_CREATE_SURVEY_DATA_ACTION.equals(intent.getAction())) {
                     BaseServiceBundle data=(BaseServiceBundle) Session.popServiceValue(SurveyService.ALL_CREATE_SURVEY_DATA_ACTION);
-                    orgUnitList=(List<OrgUnit>)data.getModelList(OrgUnit.class.getName());
-                    orgUnitLevelList=(List<OrgUnitLevel>)data.getModelList(OrgUnitLevel.class.getName());
-                    allProgramList=(List<Program>)data.getModelList(Program.class.getName());
+                    orgUnitList=(List<OrgUnitDB>)data.getModelList(OrgUnitDB.class.getName());
+                    orgUnitLevelList=(List<OrgUnitLevelDB>)data.getModelList(OrgUnitLevelDB.class.getName());
+                    allProgramList=(List<ProgramDB>)data.getModelList(ProgramDB.class.getName());
                     create();
                 }
         }
@@ -568,13 +569,13 @@ public class CreateSurveyFragment extends Fragment {
     public class OrgUnitHierarchy {
 
         //Used to control the active selectedHierarchy
-        List<OrgUnit> selectedHierarchy;
+        List<OrgUnitDB> selectedHierarchy;
 
         //Used to restore the saved org unit list in preferences
         String savedUidsList;
 
         public OrgUnitHierarchy() {
-            selectedHierarchy = new ArrayList<OrgUnit>();
+            selectedHierarchy = new ArrayList<OrgUnitDB>();
             //get and set the lastOrgUnit list from Preferences
             setLastOrgUnitStringList();
         }
@@ -584,7 +585,7 @@ public class CreateSurveyFragment extends Fragment {
         }
 
         //Add the last valid org unit and remove the unselected levels
-        public void addOrgUnit(OrgUnit orgUnit) {
+        public void addOrgUnit(OrgUnitDB orgUnit) {
             for (int i = selectedHierarchy.size()-1; i > 0; i--) {
                 //Remove the next levels from the active org unit selected list.
                     if (selectedHierarchy.get(i).getOrgUnitLevel().getId_org_unit_level() >= orgUnit.getOrgUnitLevel().getId_org_unit_level())
@@ -604,7 +605,7 @@ public class CreateSurveyFragment extends Fragment {
         //Saved the selectedHierarchy list in the preferences
         public String saveSelectionInPreferences() {
             String orgUnitList = "";
-            for (OrgUnit orgUnit : selectedHierarchy) {
+            for (OrgUnitDB orgUnit : selectedHierarchy) {
                 orgUnitList += orgUnit.getUid() + TOKEN;
             }
             orgUnitList=orgUnitList.substring(0,orgUnitList.lastIndexOf(TOKEN));
@@ -624,7 +625,12 @@ public class CreateSurveyFragment extends Fragment {
             return list[0];
         }
 
-        public OrgUnit getLastSelected() {
+        public OrgUnitDB getLastSelected() {
+            OrgUnitDB filteredOrgUnit = filter.getSelectedOrgUnitFilter();
+            if(filteredOrgUnit!=null && filteredOrgUnit.getUid()!=null) {
+                return filteredOrgUnit;
+            }
+            //old way
             if(selectedHierarchy.size()>0)
                 return selectedHierarchy.get(selectedHierarchy.size()-1);
             else
