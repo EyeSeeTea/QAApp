@@ -82,7 +82,7 @@ public class EyeSeeTeaApplication extends Application {
 
         // Create indexes to accelerate the DB selects and avoid SQlite errors
         createDBIndexes();
-        initBugShaker();
+        //initBugShaker();
     }
 
     @Override
@@ -148,7 +148,7 @@ public class EyeSeeTeaApplication extends Application {
                 .setLoggingEnabled(BuildConfig.DEBUG)
                 .setAlertDialogType(AlertDialogType.APP_COMPAT)
                 .setGitHubInfo(new GitHubConfiguration(
-                        "eyeseetea/malariapp",
+                        "eyeseetea/QAApp",
                         BuildConfig.GIT_HUB_BOT_TOKEN,
                         "eyeseeteabottest/snapshots",
                         "master"))
