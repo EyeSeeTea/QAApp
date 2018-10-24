@@ -185,7 +185,6 @@ public class SurveyPlanner {
 
         ScoreType scoreType = new ScoreType(survey.getMainScore());
 
-        ScoreType scoreType = new ScoreType(scoreType.getMainScore());
         if (scoreType.isTypeA()) {
             return getInXMonths(eventDate, server.getNextScheduleMatrix().getScoreAMonths());
         }
