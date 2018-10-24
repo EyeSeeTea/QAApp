@@ -19,7 +19,6 @@
 
 package org.eyeseetea.malariacare;
 
-import android.animation.LayoutTransition;
 import android.app.Activity;
 import android.app.AlertDialog;
 import android.content.Context;
@@ -27,12 +26,9 @@ import android.content.DialogInterface;
 import android.content.Intent;
 import android.content.SharedPreferences;
 import android.os.AsyncTask;
-import android.os.Build;
 import android.os.Bundle;
 import android.preference.PreferenceManager;
-import android.support.annotation.Nullable;
 import android.support.v4.app.ActivityCompat;
-import android.support.v4.content.ContextCompat;
 import android.support.v7.widget.CardView;
 import android.text.Editable;
 import android.text.Html;
@@ -43,17 +39,12 @@ import android.util.Log;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
-import android.view.animation.Animation;
-import android.view.animation.AnimationUtils;
 import android.view.inputmethod.InputMethodManager;
 import android.widget.AdapterView;
 import android.widget.ArrayAdapter;
-import android.widget.Button;
 import android.widget.EditText;
 import android.widget.FrameLayout;
 import android.widget.LinearLayout;
-import android.widget.ProgressBar;
-import android.widget.RelativeLayout;
 import android.widget.Spinner;
 import android.widget.TextView;
 import android.widget.Toast;
@@ -149,14 +140,6 @@ public class LoginActivity extends AbsLoginActivity {
                 parent.setSelection(0);
             }
         });
-    }
-
-    private void replaceDhisLogoToHNQISLogo() {
-        FrameLayout progressBarContainer = (FrameLayout) findViewById(R.id.layout_dhis_logo);
-        ((org.hisp.dhis.client.sdk.ui.views.FontTextView)progressBarContainer.getChildAt(2)).setText("");
-
-        LayoutInflater inflater = (LayoutInflater)this.getSystemService(Context.LAYOUT_INFLATER_SERVICE);
-        progressBarContainer.addView(inflater.inflate(R.layout.progress_logo_item, null));
     }
 
     private void replaceDhisLogoToHNQISLogo() {
