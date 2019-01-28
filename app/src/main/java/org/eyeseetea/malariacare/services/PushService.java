@@ -23,9 +23,10 @@ package org.eyeseetea.malariacare.services;
 import android.app.IntentService;
 import android.content.Intent;
 
+import org.eyeseetea.malariacare.data.database.datasources.ServerInfoLocalDataSource;
 import org.eyeseetea.malariacare.data.database.iomodules.dhis.exporter.PushController;
 import org.eyeseetea.malariacare.data.database.utils.Session;
-import org.eyeseetea.malariacare.data.remote.api.ServerInfoDataSource;
+import org.eyeseetea.malariacare.data.remote.api.ServerInfoRemoteDataSource;
 import org.eyeseetea.malariacare.data.repositories.ServerInfoRepository;
 import org.eyeseetea.malariacare.domain.boundary.IPushController;
 import org.eyeseetea.malariacare.domain.boundary.executors.IAsyncExecutor;
@@ -88,8 +89,9 @@ public class PushService extends IntentService {
 
         IMainExecutor mainExecutor = new UIThreadExecutor();
         IAsyncExecutor asyncExecutor = new AsyncExecutor();
-        ServerInfoRepository serverInfoRepository = new ServerInfoRepository(new ServerInfoDataSource(Session.getCredentials()));
-        pushUseCase = new PushUseCase(pushController, mainExecutor, asyncExecutor, serverInfoRepository);
+        ServerInfoRemoteDataSource serverInfoRemoteDataSource = new ServerInfoRemoteDataSource(Session.getCredentials());
+        ServerInfoLocalDataSource serverInfoLocalDataSource = new ServerInfoLocalDataSource(this);
+        pushUseCase = new PushUseCase(pushController, mainExecutor, asyncExecutor, new ServerInfoRepository(serverInfoLocalDataSource, serverInfoRemoteDataSource));
     }
 
     public void onPushFinished() {

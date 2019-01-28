@@ -28,9 +28,7 @@ import android.os.Bundle;
 import android.os.Handler;
 import android.os.Looper;
 import android.telephony.TelephonyManager;
-import android.text.Html;
 import android.text.SpannableString;
-import android.text.Spanned;
 import android.text.method.LinkMovementMethod;
 import android.text.util.Linkify;
 import android.util.Log;
@@ -39,6 +37,7 @@ import android.view.View;
 import android.widget.TextView;
 import android.widget.Toast;
 
+import org.eyeseetea.malariacare.data.database.datasources.ServerInfoLocalDataSource;
 import org.eyeseetea.malariacare.data.database.model.OrgUnitDB;
 import org.eyeseetea.malariacare.data.database.model.ProgramDB;
 import org.eyeseetea.malariacare.data.database.model.SurveyDB;
@@ -48,11 +47,17 @@ import org.eyeseetea.malariacare.data.database.utils.Session;
 import org.eyeseetea.malariacare.data.database.utils.metadata.PhoneMetaData;
 import org.eyeseetea.malariacare.data.database.utils.planning.SurveyPlanner;
 import org.eyeseetea.malariacare.data.remote.api.PullDhisApiDataSource;
+import org.eyeseetea.malariacare.data.remote.api.ServerInfoRemoteDataSource;
+import org.eyeseetea.malariacare.data.repositories.ServerInfoRepository;
+import org.eyeseetea.malariacare.domain.boundary.repositories.IServerInfoRepository;
+import org.eyeseetea.malariacare.domain.entity.ServerInfo;
+import org.eyeseetea.malariacare.domain.usecase.GetServerInfoUseCase;
 import org.eyeseetea.malariacare.drive.DriveRestController;
 import org.eyeseetea.malariacare.layout.dashboard.builder.AppSettingsBuilder;
 import org.eyeseetea.malariacare.layout.dashboard.controllers.DashboardController;
 import org.eyeseetea.malariacare.layout.dashboard.controllers.ImproveModuleController;
-import org.eyeseetea.malariacare.layout.dashboard.controllers.ModuleController;
+import org.eyeseetea.malariacare.presentation.executors.AsyncExecutor;
+import org.eyeseetea.malariacare.presentation.executors.UIThreadExecutor;
 import org.eyeseetea.malariacare.services.SurveyService;
 import org.eyeseetea.malariacare.utils.AUtils;
 import org.eyeseetea.malariacare.utils.Constants;
@@ -65,6 +70,7 @@ public class DashboardActivity extends BaseActivity {
     public DashboardController dashboardController;
     static Handler handler;
     public static DashboardActivity dashboardActivity;
+    private boolean isInvalidServerDialogShowed = false;
     private boolean mIsVisible = false;
 
     @Override
@@ -204,9 +210,30 @@ public class DashboardActivity extends BaseActivity {
         Log.d(TAG, "onResume");
         super.onResume();
         mIsVisible = true;
+
+        showInvalidServerDialogIfIsRequired();
         getSurveysFromService();
         DriveRestController.getInstance().syncMedia();
         DashboardActivity.dashboardActivity.reloadActiveTab();
+    }
+
+    private void showInvalidServerDialogIfIsRequired() {
+        IServerInfoRepository serverStatusRepository = new ServerInfoRepository(new ServerInfoLocalDataSource(getApplicationContext()),
+                new ServerInfoRemoteDataSource(Session.getCredentials()));
+        GetServerInfoUseCase serverStatusUseCase = new GetServerInfoUseCase(serverStatusRepository,
+                new UIThreadExecutor(), new AsyncExecutor());
+        serverStatusUseCase.execute(new GetServerInfoUseCase.Callback() {
+            @Override
+            public void onComplete(ServerInfo serverInfo) {
+                if(!serverInfo.isServerSupported() && !isInvalidServerDialogShowed){
+                    showInvalidServerDialog();
+                }
+            }
+        });
+    }
+
+    public void setIsInvalidServerDialogShowed(boolean value){
+        isInvalidServerDialogShowed = value;
     }
 
     @Override
@@ -410,6 +437,13 @@ public class DashboardActivity extends BaseActivity {
 
     public boolean isVisible() {
         return mIsVisible;
+    }
+
+    public void showInvalidServerDialog() {
+        String message = DashboardActivity.dashboardActivity.getString(R.string.recommend_upgrade) + "\n" +
+                DashboardActivity.dashboardActivity.getString(R.string.google_play_url);
+        showException(DashboardActivity.dashboardActivity.getString(R.string.server_version_error), message);
+        setIsInvalidServerDialogShowed(true);
     }
 
 

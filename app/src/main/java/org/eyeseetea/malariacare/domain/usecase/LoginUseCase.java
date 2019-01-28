@@ -25,10 +25,11 @@ import org.eyeseetea.malariacare.domain.boundary.executors.IMainExecutor;
 import org.eyeseetea.malariacare.domain.boundary.repositories.IServerInfoRepository;
 import org.eyeseetea.malariacare.domain.boundary.repositories.IUserAccountRepository;
 import org.eyeseetea.malariacare.domain.entity.Credentials;
-import org.eyeseetea.malariacare.domain.entity.ServerInfo;
 import org.eyeseetea.malariacare.domain.entity.UserAccount;
+import org.eyeseetea.malariacare.domain.common.ReadPolicy;
 import org.eyeseetea.malariacare.domain.exception.InvalidCredentialsException;
 import org.eyeseetea.malariacare.domain.exception.NetworkException;
+import org.hisp.dhis.client.sdk.models.common.UnsupportedServerVersionException;
 
 import java.net.MalformedURLException;
 import java.net.UnknownHostException;
@@ -44,72 +45,64 @@ public class LoginUseCase implements UseCase{
 
         void onNetworkError();
 
-        void onServerVersionError();
+        void onUnsupportedServerVersion();
     }
 
     private IMainExecutor mMainExecutor;
     private IAsyncExecutor mAsyncExecutor;
     private IUserAccountRepository mUserAccountRepository;
-    private IServerInfoRepository mServerVersionDataSource;
+    private IServerInfoRepository mServerRepository;
     private Credentials credentials;
-    private int maxApiVersion;
     private Callback callback;
 
     public LoginUseCase(IUserAccountRepository userAccountRepository,
-                        IServerInfoRepository serverVersionDataSource,
+                        IServerInfoRepository serverRepository,
                         IMainExecutor mainExecutor,
                         IAsyncExecutor asyncExecutor) {
         mMainExecutor = mainExecutor;
         mAsyncExecutor = asyncExecutor;
         mUserAccountRepository = userAccountRepository;
-        mServerVersionDataSource = serverVersionDataSource;
+        mServerRepository = serverRepository;
     }
 
-    public void execute(Credentials credentials, int maxApiVersion, final Callback callback) {
+    public void execute(Credentials credentials, final Callback callback) {
         this.credentials = credentials;
-        this.maxApiVersion = maxApiVersion;
         this.callback = callback;
         mAsyncExecutor.run(this);
     }
 
     @Override
     public void run() {
-        if(isValidServerVersion()){
-            mUserAccountRepository.login(credentials,
-                    new IRepositoryCallback<UserAccount>() {
-                        @Override
-                        public void onSuccess(UserAccount userAccount) {
-                            notifyOnLoginSuccess();
-                        }
-
-                        @Override
-                        public void onError(Throwable throwable) {
-                            if (throwable instanceof MalformedURLException
-                                    || throwable instanceof UnknownHostException) {
-                                notifyOnServerURLNotValid();
-                            } else if (throwable instanceof InvalidCredentialsException) {
-                                notifyOnInvalidCredentials();
-                            } else if (throwable instanceof NetworkException) {
-                                notifyOnNetworkError();
-                            }
-                        }
-                    });
-        } else {
-            notifyOnServerVersionError();
-        }
-    }
-
-    private boolean isValidServerVersion() {
-        boolean isValidServer = false;
-        if(credentials.isDemoCredentials()) {
-            isValidServer = true;
-        } else {
-            ServerInfo serverInfo = mServerVersionDataSource.get();
-            if(serverInfo.getVersion() <= maxApiVersion){
-                isValidServer = true;
+        if(!credentials.isDemoCredentials()) {
+            try {
+                mServerRepository.getServerInfo(ReadPolicy.NETWORK_FIRST);
+            } catch (Exception e) {
+                e.printStackTrace();
+                notifyOnNetworkError();
+                return;
             }
         }
-        return isValidServer;
+
+        mUserAccountRepository.login(credentials, new IRepositoryCallback<UserAccount>() {
+            @Override
+            public void onSuccess(UserAccount userAccount) {
+                notifyOnLoginSuccess();
+            }
+
+            @Override
+            public void onError(Throwable throwable) {
+                if (throwable instanceof MalformedURLException
+                        || throwable instanceof UnknownHostException) {
+                    notifyOnServerURLNotValid();
+                } else if (throwable instanceof InvalidCredentialsException) {
+                    notifyOnInvalidCredentials();
+                } else if (throwable instanceof NetworkException) {
+                    notifyOnNetworkError();
+                } else if (throwable instanceof UnsupportedServerVersionException){
+                    notifyOnServerVersionError();
+                }
+            }
+        });
     }
 
     private void notifyOnLoginSuccess() {
@@ -149,7 +142,7 @@ public class LoginUseCase implements UseCase{
         mMainExecutor.run(new Runnable() {
             @Override
             public void run() {
-                callback.onServerVersionError();
+                callback.onUnsupportedServerVersion();
             }
         });
     }

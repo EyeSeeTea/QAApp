@@ -49,18 +49,17 @@ import android.widget.Spinner;
 import android.widget.TextView;
 import android.widget.Toast;
 
+import org.eyeseetea.malariacare.data.database.datasources.ServerInfoLocalDataSource;
 import org.eyeseetea.malariacare.data.database.model.UserDB;
 import org.eyeseetea.malariacare.data.database.utils.LanguageContextWrapper;
 import org.eyeseetea.malariacare.data.database.utils.PreferencesState;
 import org.eyeseetea.malariacare.data.database.utils.Session;
 import org.eyeseetea.malariacare.data.remote.api.PullDhisApiDataSource;
-import org.eyeseetea.malariacare.data.remote.api.ServerInfoDataSource;
+import org.eyeseetea.malariacare.data.remote.api.ServerInfoRemoteDataSource;
 import org.eyeseetea.malariacare.data.repositories.ServerInfoRepository;
 import org.eyeseetea.malariacare.data.repositories.UserAccountRepository;
 import org.eyeseetea.malariacare.domain.boundary.executors.IAsyncExecutor;
 import org.eyeseetea.malariacare.domain.boundary.executors.IMainExecutor;
-import org.eyeseetea.malariacare.data.IServerInfoDataSource;
-import org.eyeseetea.malariacare.domain.boundary.repositories.IServerInfoRepository;
 import org.eyeseetea.malariacare.domain.boundary.repositories.IUserAccountRepository;
 import org.eyeseetea.malariacare.domain.entity.Credentials;
 import org.eyeseetea.malariacare.domain.usecase.LoginUseCase;
@@ -80,6 +79,8 @@ public class LoginActivity extends AbsLoginActivity {
     private static final String TAG = ".LoginActivity";
 
     public IUserAccountRepository mUserAccountRepository = new UserAccountRepository(this);
+    IAsyncExecutor asyncExecutor = new AsyncExecutor();
+    IMainExecutor mainExecutor = new UIThreadExecutor();
     LogoutUseCase mLogoutUseCase = new LogoutUseCase(mUserAccountRepository);
     public LoginActivityStrategy mLoginActivityStrategy = new LoginActivityStrategy(this);
 
@@ -231,14 +232,13 @@ public class LoginActivity extends AbsLoginActivity {
         showProgress();
 
         final Credentials credentials = new Credentials(serverUrl, username, password);
-        int lastCompatibleServerVersion = Integer.parseInt(getApplicationContext().getString(R.string.max_compatible_server_version));
 
-        ServerInfoDataSource mServerVersionDataSource = new ServerInfoDataSource(credentials);
-        IServerInfoRepository repository = new ServerInfoRepository(mServerVersionDataSource);
-        IAsyncExecutor asyncExecutor = new AsyncExecutor();
-        IMainExecutor mainExecutor = new UIThreadExecutor();
-        LoginUseCase mLoginUseCase = new LoginUseCase(mUserAccountRepository, repository, mainExecutor, asyncExecutor);
-        mLoginUseCase.execute(credentials, lastCompatibleServerVersion,
+        ServerInfoLocalDataSource mServerLocalDataSource = new ServerInfoLocalDataSource(getApplicationContext());
+        ServerInfoRemoteDataSource mServerRemoteDataSource = new ServerInfoRemoteDataSource(credentials);
+        ServerInfoRepository serverInfoRepository = new ServerInfoRepository(mServerLocalDataSource, mServerRemoteDataSource);
+
+        LoginUseCase mLoginUseCase = new LoginUseCase(mUserAccountRepository, serverInfoRepository, mainExecutor, asyncExecutor);
+        mLoginUseCase.execute(credentials,
                 new LoginUseCase.Callback() {
                     @Override
                     public void onLoginSuccess() {
@@ -271,8 +271,10 @@ public class LoginActivity extends AbsLoginActivity {
                     }
 
                     @Override
-                    public void onServerVersionError() {
-                        showError(getApplicationContext().getString(R.string.server_version_error));
+                    public void onUnsupportedServerVersion() {
+                        showError(PreferencesState.getInstance().getContext().getString(
+                                R.string.login_error_unsupported_server_version));
+
                     }
                 });
     }

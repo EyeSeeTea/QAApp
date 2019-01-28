@@ -184,15 +184,16 @@ public class SurveyPlanner {
         Server server = PreferencesState.getInstance().getServer();
 
         ScoreType scoreType = new ScoreType(survey.getMainScore());
-
         if (scoreType.isTypeA()) {
             return getInXMonths(eventDate, server.getNextScheduleMatrix().getScoreAMonths());
         }
 
+        //BC + Low OrgUnit -> 4
         if (survey.isLowProductivity()) {
             return getInXMonths(eventDate,  server.getNextScheduleMatrix().getLowProductivityMonths());
         }
 
+        //BC + High OrgUnit -> 2
         return getInXMonths(eventDate,  server.getNextScheduleMatrix().getHighProductivityMonths());
     }
 

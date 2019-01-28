@@ -25,21 +25,21 @@ import static org.junit.Assert.assertThat;
 import static org.mockito.Mockito.when;
 
 import org.eyeseetea.malariacare.data.database.iomodules.dhis.exporter.PushController;
-import org.eyeseetea.malariacare.data.remote.api.ServerInfoDataSource;
-import org.eyeseetea.malariacare.data.repositories.ServerInfoRepository;
 import org.eyeseetea.malariacare.domain.boundary.IPushController;
 import org.eyeseetea.malariacare.domain.boundary.executors.IAsyncExecutor;
 import org.eyeseetea.malariacare.domain.boundary.executors.IMainExecutor;
+import org.eyeseetea.malariacare.domain.boundary.repositories.IServerInfoRepository;
 import org.eyeseetea.malariacare.domain.entity.Credentials;
+import org.eyeseetea.malariacare.domain.entity.ServerInfo;
+import org.eyeseetea.malariacare.domain.common.ReadPolicy;
 import org.junit.Rule;
 import org.junit.Test;
-import org.junit.runner.RunWith;
 import org.mockito.Mock;
 import org.mockito.junit.MockitoJUnit;
-import org.mockito.junit.MockitoJUnitRunner;
 import org.mockito.junit.MockitoRule;
 
 public class PushUseCaseTest {
+
     @Rule
     public MockitoRule rule = MockitoJUnit.rule();
 
@@ -63,10 +63,21 @@ public class PushUseCaseTest {
             }
         };
         Credentials credentials = new Credentials("", "", "");
-        ServerInfoRepository serverInfoRepository = new ServerInfoRepository(new ServerInfoDataSource(credentials));
+        IServerInfoRepository serverInfoRepository = new IServerInfoRepository() {
+            @Override
+            public ServerInfo getServerInfo(ReadPolicy readPolicy) throws Exception {
+                return new ServerInfo(30);
+            }
+
+            @Override
+            public void save(ServerInfo serverInfo) {
+
+            }
+        };
+
         PushUseCase pushUseCase = new PushUseCase(mPushController, mainExecutor, asyncExecutor, serverInfoRepository);
 
-        pushUseCase.execute(credentials, 0, new PushUseCase.Callback() {
+        pushUseCase.execute(credentials, new PushUseCase.Callback() {
 
             @Override
             public void onComplete(PushController.Kind kind) {
@@ -117,7 +128,7 @@ public class PushUseCaseTest {
     }
 
     private void givenThereIsAInProgressPushController() {
-        when(mPushController.isPushInProgress()).thenReturn(true);
+            when(mPushController.isPushInProgress()).thenReturn(true);
     }
 
 

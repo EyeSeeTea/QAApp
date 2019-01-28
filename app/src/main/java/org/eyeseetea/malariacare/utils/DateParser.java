@@ -12,6 +12,14 @@ public class DateParser {
     public final static String LONG_DATE_FORMAT = "yyyy-MM-dd'T'HH:mm:ss.SSS";
     public final static String LONG_DATE_FORMAT_WITH_SPECIFIC_UTC_TIME_ZONE = "yyyy-MM-dd'T'HH:mm:ss.SSSZ";
 
+    public static String getEuropeanFormattedDate(Date date) {
+        SimpleDateFormat sdf = new SimpleDateFormat(EUROPEAN_DATE_FORMAT);
+        if(date==null){
+            return "";
+        }
+        return sdf.format(date);
+    }
+
     public String userFormatDate(Date date, Locale locale) {
         if (date == null) {
             return "";
@@ -30,7 +38,12 @@ public class DateParser {
 
     private String formatDate(Date date, Locale locale) {
         DateFormat dateFormatter = DateFormat.getDateInstance(DateFormat.DEFAULT, locale);
-        return dateFormatter.format(date);
+        try {
+            return dateFormatter.format(date);
+        }catch (Exception e){
+            e.printStackTrace();
+            return "";
+        }
     }
 
 
@@ -38,7 +51,12 @@ public class DateParser {
      * Turns a given date into a parseable String according to sdk date format
      */
     public String format(Date date, String format) {
-        return (date != null) ? new SimpleDateFormat(format).format(date) : null;
+        try {
+            return (date != null) ? new SimpleDateFormat(format).format(date) : null;
+        }catch (Exception e){
+            e.printStackTrace();
+            return null;
+        }
     }
 
     public Date parseDate(String dateAsString, String format) {

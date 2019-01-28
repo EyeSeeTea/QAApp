@@ -18,20 +18,37 @@
  */
 
 package org.eyeseetea.malariacare.data.repositories;
-
 import org.eyeseetea.malariacare.data.IServerInfoDataSource;
+import org.eyeseetea.malariacare.data.database.datasources.ServerInfoLocalDataSource;
+import org.eyeseetea.malariacare.data.remote.api.ServerInfoRemoteDataSource;
 import org.eyeseetea.malariacare.domain.boundary.repositories.IServerInfoRepository;
 import org.eyeseetea.malariacare.domain.entity.ServerInfo;
+import org.eyeseetea.malariacare.domain.common.ReadPolicy;
 
 public class ServerInfoRepository implements IServerInfoRepository {
-    IServerInfoDataSource serverInfoDataSource;
+    IServerInfoDataSource serverInfoLocalDataSource;
+    IServerInfoDataSource serverInfoRemoteDataSource;
 
-    public ServerInfoRepository(IServerInfoDataSource serverInfoDataSource) {
-        this.serverInfoDataSource = serverInfoDataSource;
+    public ServerInfoRepository(ServerInfoLocalDataSource serverInfoLocalDataSource,
+                                ServerInfoRemoteDataSource serverInfoRemoteDataSource) {
+        this.serverInfoLocalDataSource = serverInfoLocalDataSource;
+        this.serverInfoRemoteDataSource = serverInfoRemoteDataSource;
     }
 
     @Override
-    public ServerInfo get() {
-        return serverInfoDataSource.get();
+    public ServerInfo getServerInfo(ReadPolicy readPolicy) {
+        ServerInfo serverInfo = null;
+        if(readPolicy.equals(ReadPolicy.CACHE)){
+            return serverInfoLocalDataSource.get();
+        }else if (readPolicy.equals(readPolicy.NETWORK_FIRST)){
+            serverInfo = serverInfoRemoteDataSource.get();
+            serverInfoLocalDataSource.save(serverInfo);
+        }
+        return serverInfo;
+    }
+
+    @Override
+    public void save(ServerInfo serverInfo) {
+        serverInfoLocalDataSource.save(serverInfo);
     }
 }

@@ -26,7 +26,7 @@ import android.util.AttributeSet;
 /**
  * Created by arrizabalaga on 11/02/16.
  */
-public class ReadonlyPreference extends EditTextPreference{
+public class ReadonlyPreference extends EditTextPreference {
 
     public ReadonlyPreference(Context context, AttributeSet attrs, int defStyleAttr) {
         super(context, attrs, defStyleAttr);

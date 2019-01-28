@@ -26,6 +26,7 @@ import org.eyeseetea.malariacare.domain.boundary.executors.IMainExecutor;
 import org.eyeseetea.malariacare.domain.boundary.repositories.IServerInfoRepository;
 import org.eyeseetea.malariacare.domain.entity.Credentials;
 import org.eyeseetea.malariacare.domain.entity.ServerInfo;
+import org.eyeseetea.malariacare.domain.common.ReadPolicy;
 import org.eyeseetea.malariacare.domain.exception.ConversionException;
 import org.eyeseetea.malariacare.domain.exception.NetworkException;
 import org.eyeseetea.malariacare.domain.exception.SurveysToPushNotFoundException;
@@ -37,7 +38,6 @@ public class PushUseCase implements UseCase {
     private IPushController mPushController;
     private IServerInfoRepository mServerInfoRepository;
     private Credentials credentials;
-    private int maxApiVersion;
 
     private IMainExecutor mMainExecutor;
     private IAsyncExecutor mAsyncExecutor;
@@ -53,9 +53,8 @@ public class PushUseCase implements UseCase {
         mServerInfoRepository = serverInfoRepository;
     }
 
-    public void execute(Credentials credentials, int maxApiVersion, final Callback callback) {
+    public void execute(Credentials credentials, final Callback callback) {
         this.credentials = credentials;
-        this.maxApiVersion = maxApiVersion;
         this.callback = callback;
         mAsyncExecutor.run(this);
     }
@@ -66,9 +65,14 @@ public class PushUseCase implements UseCase {
             callback.onPushInProgressError();
             return;
         }
-        if(!isValidServerVersion()){
-            callback.onServerVersionError();
-            return;
+        try {
+            if(!isValidServerVersion()){
+                notifyOnServerVersionError();
+                return;
+            }
+        } catch (Exception e) {
+            e.printStackTrace();
+            notifyOnNetworkError();
         }
         mPushController.changePushInProgress(true);
 
@@ -77,7 +81,7 @@ public class PushUseCase implements UseCase {
         mPushController.push(new IPushController.IPushControllerCallback() {
             @Override
             public void onComplete(PushController.Kind kind) {
-                System.out.println("PusUseCase Complete");
+                System.out.println("PushUseCase Complete");
 
                 mPushController.changePushInProgress(false);
 
@@ -86,7 +90,7 @@ public class PushUseCase implements UseCase {
 
             @Override
             public void onError(Throwable throwable) {
-                System.out.println("PusUseCase error");
+                System.out.println("PushUseCase error");
 
                 if (throwable instanceof NetworkException) {
                     mPushController.changePushInProgress(false);
@@ -114,17 +118,22 @@ public class PushUseCase implements UseCase {
 
     }
 
-    private boolean isValidServerVersion() {
-        boolean isValidServer = false;
+    private boolean isValidServerVersion() throws Exception {
         if(credentials.isDemoCredentials()) {
-            isValidServer = true;
-        } else {
-            ServerInfo serverInfo = mServerInfoRepository.get();
-            if(serverInfo.getVersion() <= maxApiVersion){
-                isValidServer = true;
-            }
+            return true;
         }
-        return isValidServer;
+        ServerInfo localServerInfo = mServerInfoRepository.getServerInfo(ReadPolicy.CACHE);
+
+        ServerInfo remoteServerInfo = mServerInfoRepository.getServerInfo(ReadPolicy.NETWORK_FIRST);
+
+        if (localServerInfo.getVersion() == -1 ||
+                localServerInfo.getVersion() == remoteServerInfo.getVersion()) {
+            return true;
+        } else {
+            remoteServerInfo.markAsUnsupported();
+            mServerInfoRepository.save(remoteServerInfo);
+            return false;
+        }
     }
 
     private void notifyOnComplete(final PushController.Kind kind) {
@@ -177,6 +186,15 @@ public class PushUseCase implements UseCase {
             @Override
             public void run() {
                 callback.onInformativeError(throwable.getMessage());
+            }
+        });
+    }
+
+    private void notifyOnServerVersionError() {
+        mMainExecutor.run(new Runnable() {
+            @Override
+            public void run() {
+                callback.onServerVersionError();
             }
         });
     }
