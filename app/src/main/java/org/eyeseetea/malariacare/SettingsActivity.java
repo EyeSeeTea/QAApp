@@ -46,7 +46,7 @@ import org.eyeseetea.malariacare.data.database.utils.PreferencesState;
 import org.eyeseetea.malariacare.data.repositories.UserAccountRepository;
 import org.eyeseetea.malariacare.domain.usecase.LogoutUseCase;
 import org.eyeseetea.malariacare.layout.dashboard.builder.AppSettingsBuilder;
-import org.eyeseetea.malariacare.views.SimpleDividerItemDecoration;
+import org.eyeseetea.malariacare.views.filters.SimpleDividerItemDecoration;
 
 /**
  * A {@link android.support.v7.app.AppCompatActivity} that presents a set of application settings

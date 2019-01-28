@@ -1,4 +1,4 @@
-package org.eyeseetea.malariacare.views;
+package org.eyeseetea.malariacare.views.filters;
 
 import android.content.Context;
 import android.graphics.Canvas;
