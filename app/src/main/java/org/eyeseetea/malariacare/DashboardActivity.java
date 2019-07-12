@@ -423,12 +423,24 @@ public class DashboardActivity extends BaseActivity {
         dashboardController.onAssessSelected(survey);
     }
 
+    public void openFeedback(String surveyUid, boolean modifyFilter) {
+        dashboardController.openFeedback(surveyUid, modifyFilter);
+    }
+
     public void openFeedback(SurveyDB survey, boolean modifyFilter) {
         dashboardController.openFeedback(survey, modifyFilter);
     }
 
     public void onPlannedSurvey(SurveyDB survey, View.OnClickListener scheduleClickListener) {
         dashboardController.onPlannedSurvey(survey, scheduleClickListener);
+    }
+
+    public void openMonitoringByCalendar() {
+        dashboardController.openMonitoringByCalendar();
+    }
+
+    public void openMonitorByActions() {
+        dashboardController.openMonitorByActions();
     }
 
     public void reloadActiveTab() {

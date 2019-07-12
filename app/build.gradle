@@ -13,6 +13,8 @@ buildscript {
     }
 }
 apply plugin: 'com.android.application'
+apply plugin: 'kotlin-android-extensions'
+apply plugin: 'kotlin-android'
 apply plugin: 'io.fabric'
 
 def cfg = rootProject.ext.configuration
@@ -20,6 +22,7 @@ def libs = rootProject.ext.libraries
 
 repositories {
     maven { url 'https://maven.fabric.io/public' }
+    mavenCentral()
 }
 
 android {
@@ -118,7 +121,7 @@ android {
         }
         hnqis {
             applicationId "org.eyeseetea.malariacare.hnqis_ng_dev"
-            versionName "1.4.2"
+            versionName "1.5.0"
             buildConfigField "boolean", "translations", "true"
             buildConfigField "String", "defaultLocale", "\"en\""
             resValue "string", "authority", applicationId+versionName+"_DHIS2_DEFAULT_AUTHORITY"
@@ -223,10 +226,10 @@ dependencies {
     compile "com.squareup:javapoet:${libs.javapoetVersion}"
 
     //DBFlow
-    annotationProcessor "com.github.Raizlabs.DBFlow:dbflow-processor:${libs.dbFlowVersion}"
-    compile "com.github.Raizlabs.DBFlow:dbflow:${libs.dbFlowVersion}"
-    compile "com.github.Raizlabs.DBFlow:dbflow-core:${libs.dbFlowVersion}"
-    compile "com.github.Raizlabs.DBFlow:dbflow-sqlcipher:${libs.dbFlowVersion}"
+    annotationProcessor "com.github.agrosner.dbflow:dbflow-processor:${libs.dbFlowVersion}"
+    compile "com.github.agrosner.dbflow:dbflow:${libs.dbFlowVersion}"
+    compile "com.github.agrosner.dbflow:dbflow-core:${libs.dbFlowVersion}"
+    compile "com.github.agrosner.dbflow:dbflow-sqlcipher:${libs.dbFlowVersion}"
     // Instrumented tests dependencies
     androidTestCompile "com.squareup.okhttp3:mockwebserver:${libs.mockwebserverVersion}"
     androidTestCompile "org.mockito:mockito-core:${libs.mockitoVersion}"
@@ -235,7 +238,9 @@ dependencies {
     compile(project(path: ':bugshaker')) {
         exclude group: "com.google.android.gms"
     }
+    implementation "org.jetbrains.kotlin:kotlin-stdlib-jdk7:$kotlin_version"
 }
 
+check.dependsOn ktlint
 
 
