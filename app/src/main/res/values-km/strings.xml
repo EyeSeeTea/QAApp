@@ -154,7 +154,6 @@ evaluation"</string>
 <string name="server_url">"DHIS2 server"</string>
 <string name="settings_text_dhis_password">"DHIS password"</string>
 <string name="settings_text_dhis_max_items">"DHIS max loaded surveys"</string>
-<string name="settings_monitoring_target">"គោលដៅតាមដាន"</string>
 <string name="dialog_error_push_uids">"Incorrect UIDs found in push"</string>
 <string name="dialog_error_push_no_location_and_required">"No location available and it is a required field"</string>
 <string name="dialog_info_push_imported">"Imported"</string>
@@ -197,7 +196,7 @@ evaluation"</string>
 <string name="error_message_push">"ព្រឹត្តិការណ៍នេះជាមួយនឹងលេខសម្គាល់អ្នកប្រើ %s ។ ត្រូវបានផ្ទុកឡើងដោយគ្មានកាលបរិច្ឆេទ។ សូមទាក់ទងអ្នកគ្រប់គ្រង។"</string>
 <string name="monitor_js_assessments">"ការវាយតម្លៃអនុវត្ត"</string>
 <string name="monitor_js_target">"\"គោលដៅ\""</string>
-<string name="monitor_js_quality_of_care">"\"គុណភាពនៃការថែទាំ: មុន \""</string>
+<string name="monitor_js_quality_of_care">"ថ្នាក់សមត្ថភាព -"</string>
 <string name="monitor_js_months">"\" ខែ\""</string>
 <string name="dialog_error_attribute_null">"\"លេខសម្គាល់គុណលក្ខណៈជាមួយ NULL% s សូមទាក់ទងអ្នកគ្រប់គ្រងម៉ាស៊ីនបម្រើរបស់អ្នក.\""</string>
 <string name="progress_pull_relationships">"កសាងទំនាក់ទំនងសំណួរ ..."</string>

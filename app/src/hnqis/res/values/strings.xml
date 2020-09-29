@@ -144,7 +144,6 @@ evaluation"</string>
 <string name="server_url">"DHIS2 server"</string>
 <string name="settings_text_dhis_password">"DHIS password"</string>
 <string name="settings_text_dhis_max_items">"DHIS max loaded surveys"</string>
-<string name="settings_monitoring_target">"Monitoring target"</string>
 <string name="dialog_error_push_uids">"Incorrect UIDs found in push"</string>
 <string name="dialog_error_push_no_location_and_required">"No location available and it is a required field"</string>
 <string name="dialog_error_attribute_null">\"Attribute with id %s null, please contact your server admin.\"</string>
@@ -192,7 +191,7 @@ evaluation"</string>
 <string name="error_message_push">"The event with UID: %s. was uploaded without date. Please contact the administrator. "</string>
 <string name="monitor_js_assessments">"Surveys undertaken"</string>
 <string name="monitor_js_target">"Target"</string>
-<string name="monitor_js_quality_of_care">"Quality of care: Last "</string>
+<string name="monitor_js_quality_of_care">"Competency Classes -"</string>
 <string name="monitor_js_months">" months"</string>
 <string name="monitor_js_multiple_event_legend" >"(*)More than one survey exist in the same month"</string>
 
