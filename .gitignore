@@ -41,7 +41,6 @@ captures/
 /.idea/workspace.xml
 /.idea/libraries
 .DS_Store
-app/fabric.properties
 
 # last commit file
 app/src/main/res/raw/lastcommit.txt
