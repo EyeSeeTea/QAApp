@@ -88,7 +88,7 @@ public class PlannedSurvey implements PlannedItem {
         if(survey==null || !survey.hasMainScore()){
             return NO_QUALITY_OF_CARE;
         }
-        return AUtils.round(survey.getMainScore());
+        return AUtils.round(survey.getMainScore().getScore())  + " %";
     }
 
     public Date getNextAssesment(){
@@ -112,19 +112,19 @@ public class PlannedSurvey implements PlannedItem {
 
     /**
      * Checks if this item can be shown according to the given filter
-     * @param filterProgram
+     * @param programUidFilter
      * @return
      */
     @Override
-    public boolean isShownByProgram(ProgramDB filterProgram){
+    public boolean isShownByProgram(String programUidFilter){
         //No filter -> always show
-        if(filterProgram==null){
+        if(programUidFilter==null){
             return true;
         }
 
         ProgramDB surveyProgram=survey.getProgram();
         //Returns if both match
-        return filterProgram.getId_program().equals(surveyProgram.getId_program());
+        return surveyProgram.getUid().equals(programUidFilter);
     }
 
     /**

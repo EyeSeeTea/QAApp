@@ -15,6 +15,8 @@
 <string name="settings_menu_about">"About"</string>
 <string name="settings_menu_configuration">"Settings"</string>
 <string name="settings_menu_licence">"License"</string>
+<string name="settings_menu_learning_center">"HNQIS learning center"</string>
+<string name="settings_menu_submit_ticket">"Submit a ticket"</string>
 <string name="settings_menu_logout">"Logout"</string>
 
 <string name="dialog_title_delete_survey">"Delete Survey"</string>
@@ -116,16 +118,17 @@ evaluation"</string>
 <string name="dashboard_title_planned_type_overdue">"Overdue"</string>
 <string name="dashboard_title_planned_type_next_30">"Next 30 days"</string>
 <string name="dashboard_title_planned_type_future">"Future"</string>
-<string name="dashboard_title_planned_productivity">"Prd"</string>
-<string name="dashboard_title_planned_quality_of_care">"QoC"</string>
+<string name="dashboard_title_planned_productivity_abreviation">"Prd"</string>
+<string name="dashboard_title_planned_productivity">"Productivity"</string>
+<string name="competency_title">"Competency"</string>
 <string name="dashboard_title_planned_next_qa">"Next QA"</string>
-<string name="assessment_sent_score">"Score"</string>
+<string name="assessment_sent_competency">"Competency"</string>
 <string name="feedback_show_only_failed">"Show only failed questions"</string>
 <string name="feedback_show_only_media">"Show only questions containing video/image"</string>
 <string name="feedback_show_only_one_or_show_all">"Show only last feedback"</string>
 <string name="feedback_return">"Return to all surveys"</string>
-<string name="quality_of_care">"QUALITY OF CARE (QoC) SCORE:"</string>
-<string name="overall_quality_of_care">"Overall Quality of Care (QoC) score:"</string>
+<string name="quality_of_care">"Quality of Care (QoC) Score"</string>
+<string name="overall_quality_of_care">"QoC"</string>
 <string name="feedback_info_passed">"Pass"</string>
 <string name="feedback_info_failed">"Fail"</string>
 <string name="feedback_info_not_answered">"Na"</string>
@@ -141,7 +144,6 @@ evaluation"</string>
 <string name="server_url">"DHIS2 server"</string>
 <string name="settings_text_dhis_password">"DHIS password"</string>
 <string name="settings_text_dhis_max_items">"DHIS max loaded surveys"</string>
-<string name="settings_monitoring_target">"Monitoring target"</string>
 <string name="dialog_error_push_uids">"Incorrect UIDs found in push"</string>
 <string name="dialog_error_push_no_location_and_required">"No location available and it is a required field"</string>
 <string name="dialog_error_attribute_null">\"Attribute with id %s null, please contact your server admin.\"</string>
@@ -189,7 +191,7 @@ evaluation"</string>
 <string name="error_message_push">"The event with UID: %s. was uploaded without date. Please contact the administrator. "</string>
 <string name="monitor_js_assessments">"Surveys undertaken"</string>
 <string name="monitor_js_target">"Target"</string>
-<string name="monitor_js_quality_of_care">"Quality of care: Last "</string>
+<string name="monitor_js_quality_of_care">"Competency Classes -"</string>
 <string name="monitor_js_months">" months"</string>
 <string name="monitor_js_multiple_event_legend" >"(*)More than one survey exist in the same month"</string>
 
@@ -199,6 +201,7 @@ evaluation"</string>
 <string name="developer_option_summary">This feature activates the developer options</string>
 <string name="developer_option_title">Show developer options</string>
 <string name="export_data_option_title">Export database</string>
+<string name="export_data_to_local_option_title">Export DB to local storage</string>
 <string name="import_data_option_title">"Import database"</string>
 <string name="google_play_required">This app requires Google Play Services. Please install Google Play Services on your device and relaunch this app.</string>
 <string name="account_permission_denied">Contacts permission denied. Media will not be synced</string>
@@ -233,23 +236,7 @@ evaluation"</string>
 <string name="plan_action_title">Observations &amp; Action Plan</string>
 <string name="plan_action_today_date">Completed: %s</string>
 <string name="plan_action_next_date">Next: %s</string>
-<string name="plan_action_description">Describe what was observed during the visit a specific action plan for addressing gaps. Also note an improvement over a gap identified during the last visit</string>
-<string name="plan_action_gasp_title">GAPS:</string>
-<string name="plan_action_action_plan_title">ACTION PLAN:</string>
-<string name="plan_action_action_title">ACTION:</string>
-<string-array name="plan_action_dropdown_options">
-<item>"..."</item>
-<item>Refresher training during SSV</item>
-<item>Group refresher training at a later date</item>
-<item>Plan CME activity</item>
-<item>Demonstrate technique with client</item>
-<item>Other</item>
-</string-array>
-<string-array name="plan_action_dropdown_suboptions">
-<item>...</item>
-<item>Watch video</item>
-<item>Practice proper insertion technique at time of visit</item>
-</string-array>
+<string name="plan_action_action_plan_title">ACTION PLAN</string>
 <string name="supervision_on">Results supervision on:</string>
 <string name="critical_steps">CRITICAL STEPS MISSED:</string>
 <string name="url_not_available">"The feedback URL is not available because the survey hasn't been sent to the server yet. Try sharing the feedback again later."</string>
@@ -274,6 +261,8 @@ evaluation"</string>
 <string name="html_text">Formatted text </string>
 <string name="schedule_title">Schedule survey</string>
 <string name="save">"Save"</string>
+<string name="plan_action_critical_steps_missed_title" >"CRITICAL STEPS MISSED:"</string>
+<string name="plan_action_non_critical_steps_missed_title" >"NON-CRITICAL STEPS MISSED:"</string>
 <string name="plan_action_provider_title" >"PROVIDER NAME:"</string>
 <string name="monitor_no_surveys_to_show">"No surveys to show"</string>
 <string name="health_facility">Health Facility</string>
@@ -299,4 +288,26 @@ evaluation"</string>
 <string name="feedback_not_sent">"The feedback URL is not available because the survey hasn't been sent to the server yet. Try sharing the feedback again later."</string>
 <string name="server_version_error">The server version is not supported.</string>
 <string name="recommend_upgrade">Please upgrade the app from Google Play.</string>
+
+<string name="competency_classification_not_available_name">Not Available</string>
+<string name="competency_classification_competent_name">Competent</string>
+<string name="competency_classification_competent_improvement_name">Competent, but needs improvement</string>
+<string name="competency_classification_not_competent_name">Not Competent</string>
+
+<string name="competency_classification_not_available_description">NA = Not Available. Survey created on the last application version and competency is not available.</string>
+<string name="competency_classification_competent_description">C = Competent. The provider has met all critical steps and ≥ 90% of non-critical steps</string>
+<string name="competency_classification_competent_improvement_description">CNI = Competent, but needs improvement. The provider has met all critical steps correct, but between 80% and 90% of non-critical steps</string>
+<string name="competency_classification_not_competent_description">NC = Not competent. The provider has missed at least one critical step or in case there are no critical steps, less than 80% of non-critical steps</string>
+
+<string name="competency_classification_not_available_abbreviation">NA</string>
+<string name="competency_classification_competent_abbreviation">C</string>
+<string name="competency_classification_competent_improvement_abbreviation">CNI</string>
+<string name="competency_classification_not_competent_abbreviation">NC</string>
+
+<string name="productivity_low_name">Low</string>
+<string name="productivity_high_name">High</string>
+
+<string name="export_db_to_local_success_message">exported successfully to downloads folder</string>
+<string name="export_db_to_local_error_message">An error has occurred exporting the database</string>
+
 </resources>

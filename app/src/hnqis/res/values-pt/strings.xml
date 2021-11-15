@@ -15,6 +15,8 @@
 <string name="settings_menu_about">"Acerca de"</string>
 <string name="settings_menu_configuration">"Definições"</string>
 <string name="settings_menu_licence">"Licença"</string>
+<string name="settings_menu_learning_center">"Centro de aprendizado HNQIS"</string>
+<string name="settings_menu_submit_ticket">"Envie um ticket"</string>
 <string name="settings_menu_logout">"Logout"</string>
 
 <string name="dialog_title_delete_survey">"Apagar inquérito"</string>
@@ -116,15 +118,16 @@ Passo 2: Localize a ID do paciente de 1) no Registo de Farmácia e anote se rece
 <string name="dashboard_title_planned_type_overdue">"Vencido"</string>
 <string name="dashboard_title_planned_type_next_30">"Próximos 30 dias"</string>
 <string name="dashboard_title_planned_type_future">"Futuro"</string>
-<string name="dashboard_title_planned_productivity">"Prd"</string>
-<string name="dashboard_title_planned_quality_of_care">"QoC"</string>
+<string name="dashboard_title_planned_productivity_abreviation">"Prd"</string>
+<string name="dashboard_title_planned_productivity">"Produtividade"</string>
+<string name="competency_title">"Competência"</string>
 <string name="dashboard_title_planned_next_qa">"Próx. aval."</string>
-<string name="assessment_sent_score">"Ponto"</string>
+<string name="assessment_sent_competency">"Competência"</string>
 <string name="feedback_show_only_failed">"Mostrar só falhou perguntas"</string>
 <string name="feedback_show_only_media">"Mostrar apenas perguntas contendo vídeo / imagem"</string>
 <string name="feedback_return">"Qualidade de atendimento (com base na última pesquisa)"</string>
-<string name="quality_of_care">"QUALIDADE DA ASSISTÊNCIA (QoC) PONTUAÇÃO:"</string>
-<string name="overall_quality_of_care">"Pontuação Global Quality of Care (QoC):"</string>
+<string name="quality_of_care">"Qualidade da Assistência (QoC) Pontuação"</string>
+<string name="overall_quality_of_care">"QoC"</string>
 <string name="feedback_info_passed">"Aprovado"</string>
 <string name="feedback_info_failed">"Suspenso"</string>
 <string name="feedback_info_not_answered">"Não respondeu"</string>
@@ -140,7 +143,6 @@ Passo 2: Localize a ID do paciente de 1) no Registo de Farmácia e anote se rece
 <string name="server_url">"Servidor DHIS2"</string>
 <string name="settings_text_dhis_password">"Senha DHIS"</string>
 <string name="settings_text_dhis_max_items">"DHIS max carregado inquéritos"</string>
-<string name="settings_monitoring_target">"Alvo de monitoramento"</string>
 <string name="dialog_error_push_uids">"UIDs incorretas encontradas no impulso"</string>
 <string name="dialog_error_push_no_location_and_required">"Nenhum local disponível e é um campo obrigatório"</string>
 <string name="dialog_error_attribute_null">"Atributo com id %s é nulo, por favor contacte o seu administrador do servidor."</string>
@@ -187,7 +189,7 @@ Passo 2: Localize a ID do paciente de 1) no Registo de Farmácia e anote se rece
 <string name="error_message_push">"O evento com UID: %s. foi carregado sem data. Entre em contato com o administrador."</string>
 <string name="monitor_js_assessments" >"Inquéritos realizados"</string>
 <string name="monitor_js_target" >"Objetivo"</string>
-<string name="monitor_js_quality_of_care" >"A qualidade do atendimento: Últimos"</string>
+<string name="monitor_js_quality_of_care" >"Classes de competência - "</string>
 <string name="monitor_js_months" >" meses"</string>
 <string name="monitor_js_multiple_event_legend" >"(*) Mais de uma pesquisa existe no mesmo mês"</string>
 <string name="create">Crio</string>
@@ -195,6 +197,7 @@ Passo 2: Localize a ID do paciente de 1) no Registo de Farmácia e anote se rece
 <string name="developer_option_summary">Esta opção permite que as opções de desenvolvedor</string>
 <string name="developer_option_title">Mostrar opções de desenvolvedor</string>
 <string name="export_data_option_title">Banco de dados de exportação</string>
+<string name="export_data_to_local_option_title">Exportar DB para armazenamento local</string>
 <string name="import_data_option_title">"Importar banco de dados"</string>
 <string name="google_play_required">Este aplicativo requer serviços do Google Play. Por favor, instale Serviços do Google Play no seu dispositivo e iniciar este aplicativo.</string>
 <string name="account_permission_denied">Contatos permissão negada. A mídia não serão sincronizados</string>
@@ -233,23 +236,7 @@ Passo 2: Localize a ID do paciente de 1) no Registo de Farmácia e anote se rece
 <string name="plan_action_title">Observações e Plano de Ação</string>
 <string name="plan_action_today_date">Concluído: %s</string>
 <string name="plan_action_next_date">Próxima: %s</string>
-<string name="plan_action_description">Descreva o que foi observado durante a visita um plano de ação específico para abordar lacunas. Observe também uma melhoria em relação a uma lacuna identificada durante a última visita</string>
-<string name="plan_action_gasp_title">LACUNAS:</string>
-<string name="plan_action_action_plan_title">PLANO DE AÇÃO:</string>
-<string name="plan_action_action_title">AÇAO:</string>
-<string-array name="plan_action_dropdown_options">
-<item>"..."</item>
-<item>Treinamento de atualização durante SSV</item>
-<item>Treinamento de atualização de grupo em uma data posterior</item>
-<item>Planejar a atividade do CME</item>
-<item>Demonstrar técnica com o cliente</item>
-<item>Outros</item>
-</string-array>
-<string-array name="plan_action_dropdown_suboptions">
-<item>...</item>
-<item>Assista vídeo</item>
-<item>Pratique a técnica de inserção adequada no momento da visita</item>
-</string-array>
+<string name="plan_action_action_plan_title">PLANO DE AÇÃO</string>
 <string name="supervision_on">Supervisão de resultados em:</string>
 <string name="critical_steps">PASSOS CRÍTICOS PERDIDOS:</string>
 <string name="url_not_available">O URL de comentários não está disponível porque a pesquisa ainda não foi enviada para o servidor. Tente compartilhar o feedback novamente mais tarde.</string>
@@ -267,6 +254,8 @@ Passo 2: Localize a ID do paciente de 1) no Registo de Farmácia e anote se rece
 <string name="schedule_title">"Agendar pesquisa"</string>
 <string name="save">"Salvar"</string>
 <string name="monitor_no_surveys_to_show">"Nenhuma pesquisa para mostrar"</string>
+<string name="plan_action_critical_steps_missed_title">"PASSOS CRÍTICOS PERDIDOS:"</string>
+<string name="plan_action_non_critical_steps_missed_title" >"PASSOS NÃO CRÍTICOS PERDIDOS:"</string>
 <string name="plan_action_provider_title" >"NOME DO PROVEEDOR:"</string>
 <string name="health_facility">Centro médico</string>
 <string name="mandatory">"Obrigatório"</string>
@@ -289,4 +278,32 @@ Passo 2: Localize a ID do paciente de 1) no Registo de Farmácia e anote se rece
 <string name="login_error_unsupported_server_version">A versão do servidor não é suportada</string>
 <string name="feedback_not_sent">"O URL de comentários não está disponível devido à pesquisa. Tente compartilhar o feedback novamente mais tarde."</string>
 <string name="recommend_upgrade">"Atualize o aplicativo do Google Play."</string>
+
+<string name="competency_classification_not_available_name">Não disponível</string>
+<string name="competency_classification_competent_name">Competente</string>
+<string name="competency_classification_competent_improvement_name">Competente, mas precisa de melhoriast</string>
+<string name="competency_classification_not_competent_name">Não é competente</string>
+
+<string name="competency_classification_not_available_description">NA = não disponível. Inquérito criado na última versão da aplicação e competência não está disponível</string>
+<string name="competency_classification_competent_description">C = Competente. O provedor cumpriu todas as etapas críticas e ≥ 90% das etapas não críticas</string>
+<string name="competency_classification_competent_improvement_description">CPM = Competente, mas precisa de melhorias. O provedor cumpriu todas as etapas críticas corretas, mas entre 80% e 90% das etapas não críticas</string>
+<string name="competency_classification_not_competent_description">NC = não competente. O provedor perdeu pelo menos uma etapa crítica ou, caso não haja etapas críticas, menos de 80% das etapas não críticas</string>
+
+<string name="competency_classification_not_available_abbreviation">ND</string>
+<string name="competency_classification_competent_abbreviation">C</string>
+<string name="competency_classification_competent_improvement_abbreviation">CPM</string>
+<string name="competency_classification_not_competent_abbreviation">NC</string>
+
+<string name="productivity_low_name">Baixa</string>
+<string name="productivity_high_name">Alta</string>
+
+<string name="menu_monitoring_by_calendar_title">Monitoramento antigo</string>
+<string name="action_monitor_activity_title">Atividade</string>
+<string name="action_monitor_conducted_title">Conduzida</string>
+<string name="action_monitor_save_confirm_message">Todas as ações são realizadas, tem certeza de que deseja salvar? Você não pode desfazer esta ação</string>
+<string name="load_error_message">Ocorreu um erro ao carregar os dados</string>
+<string name="save_error_message">Ocorreu um erro ao salvar os dados</string>
+
+<string name="export_db_to_local_success_message">exportado com sucesso para a pasta de downloads</string>
+<string name="export_db_to_local_error_message">Ocorreu um erro ao exportar o banco de dados</string>
 </resources>

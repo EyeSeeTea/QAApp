@@ -24,9 +24,11 @@ import android.content.Context;
 import android.content.DialogInterface;
 import android.content.Intent;
 import android.os.AsyncTask;
+import android.os.Build;
 import android.os.Bundle;
 import android.os.Handler;
 import android.os.Looper;
+import androidx.core.app.ActivityCompat;
 import android.telephony.TelephonyManager;
 import android.text.SpannableString;
 import android.text.method.LinkMovementMethod;
@@ -62,6 +64,8 @@ import org.eyeseetea.malariacare.services.SurveyService;
 import org.eyeseetea.malariacare.utils.AUtils;
 import org.eyeseetea.malariacare.utils.Constants;
 
+import java.util.Date;
+
 
 public class DashboardActivity extends BaseActivity {
 
@@ -80,7 +84,8 @@ public class DashboardActivity extends BaseActivity {
 
         handler = new Handler(Looper.getMainLooper());
         dashboardActivity = this;
-        if (getIntent().getBooleanExtra(getString(R.string.show_announcement_key), true) && !Session.getCredentials().isDemoCredentials()) {
+        if (getIntent().getBooleanExtra(getString(R.string.show_announcement_key), true)
+                && !Session.getCredentials().isDemoCredentials()) {
             new AsyncAnnouncement().execute();
         }
 
@@ -120,10 +125,13 @@ public class DashboardActivity extends BaseActivity {
         return phoneMetaData;
     }
 
-
     public void loadPhoneMetadata() {
-        PhoneMetaData phoneMetaData = getPhoneMetadata();
-        Session.setPhoneMetaData(phoneMetaData);
+        //Only It's possible until API 28
+        //https://source.android.com/devices/tech/config/device-identifiers
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.Q) {
+            PhoneMetaData phoneMetaData = getPhoneMetadata();
+            Session.setPhoneMetaData(phoneMetaData);
+        }
     }
 
     /**
@@ -190,7 +198,9 @@ public class DashboardActivity extends BaseActivity {
             return;
         }
         PreferencesState.getInstance().clearOrgUnitPreference();
-        finishAndGo(ProgressActivity.class);
+
+        Intent intent = new Intent(this, ProgressActivity.class);
+        ActivityCompat.startActivity(this, intent, null);
     }
 
     @Override
@@ -218,21 +228,22 @@ public class DashboardActivity extends BaseActivity {
     }
 
     private void showInvalidServerDialogIfIsRequired() {
-        IServerInfoRepository serverStatusRepository = new ServerInfoRepository(new ServerInfoLocalDataSource(getApplicationContext()),
-                new ServerInfoRemoteDataSource(Session.getCredentials()));
+        IServerInfoRepository serverStatusRepository = new ServerInfoRepository(
+                new ServerInfoLocalDataSource(getApplicationContext()),
+                new ServerInfoRemoteDataSource(this));
         GetServerInfoUseCase serverStatusUseCase = new GetServerInfoUseCase(serverStatusRepository,
                 new UIThreadExecutor(), new AsyncExecutor());
         serverStatusUseCase.execute(new GetServerInfoUseCase.Callback() {
             @Override
             public void onComplete(ServerInfo serverInfo) {
-                if(!serverInfo.isServerSupported() && !isInvalidServerDialogShowed){
+                if (!serverInfo.isServerSupported() && !isInvalidServerDialogShowed) {
                     showInvalidServerDialog();
                 }
             }
         });
     }
 
-    public void setIsInvalidServerDialogShowed(boolean value){
+    public void setIsInvalidServerDialogShowed(boolean value) {
         isInvalidServerDialogShowed = value;
     }
 
@@ -303,15 +314,15 @@ public class DashboardActivity extends BaseActivity {
     /**
      * Handler that starts or edits a given survey
      */
-    public void onOrgUnitSelected(OrgUnitDB orgUnit) {
-        dashboardController.onOrgUnitSelected(orgUnit);
+    public void onOrgUnitSelected(String orgUnitUid) {
+        dashboardController.onOrgUnitSelected(orgUnitUid);
     }
 
     /**
      * Handler that starts or edits a given survey
      */
-    public void onProgramSelected(ProgramDB program) {
-        dashboardController.onProgramSelected(program);
+    public void onProgramSelected(String programUid) {
+        dashboardController.onProgramSelected(programUid);
     }
 
     /**
@@ -320,7 +331,6 @@ public class DashboardActivity extends BaseActivity {
     public void onFeedbackSelected(SurveyDB survey) {
         dashboardController.onFeedbackSelected(survey);
     }
-
 
 
     public void onPlanPerOrgUnitMenuClicked(SurveyDB survey) {
@@ -399,7 +409,9 @@ public class DashboardActivity extends BaseActivity {
                                 .setNeutralButton(android.R.string.ok, null)
                                 .create();
                         alertDialog.show();
-                        ((TextView)alertDialog.findViewById(android.R.id.message)).setMovementMethod(LinkMovementMethod.getInstance());
+                        ((TextView) alertDialog.findViewById(
+                                android.R.id.message)).setMovementMethod(
+                                LinkMovementMethod.getInstance());
                     }
                 });
             }
@@ -415,12 +427,18 @@ public class DashboardActivity extends BaseActivity {
     }
 
     public void openActionPlan(SurveyDB survey) {
-        ImproveModuleController improveModuleController = (ImproveModuleController) dashboardController.getModuleByName(ImproveModuleController.getSimpleName());
+        ImproveModuleController improveModuleController =
+                (ImproveModuleController) dashboardController.getModuleByName(
+                        ImproveModuleController.getSimpleName());
         improveModuleController.onPlanActionSelected(survey);
     }
 
     public void onAssessSelected(SurveyDB survey) {
         dashboardController.onAssessSelected(survey);
+    }
+
+    public void openFeedback(String surveyUid, boolean modifyFilter) {
+        dashboardController.openFeedback(surveyUid, modifyFilter);
     }
 
     public void openFeedback(SurveyDB survey, boolean modifyFilter) {
@@ -429,6 +447,14 @@ public class DashboardActivity extends BaseActivity {
 
     public void onPlannedSurvey(SurveyDB survey, View.OnClickListener scheduleClickListener) {
         dashboardController.onPlannedSurvey(survey, scheduleClickListener);
+    }
+
+    public void openMonitoringByCalendar() {
+        dashboardController.openMonitoringByCalendar();
+    }
+
+    public void openMonitorByActions() {
+        dashboardController.openMonitorByActions();
     }
 
     public void reloadActiveTab() {
@@ -440,9 +466,11 @@ public class DashboardActivity extends BaseActivity {
     }
 
     public void showInvalidServerDialog() {
-        String message = DashboardActivity.dashboardActivity.getString(R.string.recommend_upgrade) + "\n" +
+        String message = DashboardActivity.dashboardActivity.getString(R.string.recommend_upgrade)
+                + "\n" +
                 DashboardActivity.dashboardActivity.getString(R.string.google_play_url);
-        showException(DashboardActivity.dashboardActivity.getString(R.string.server_version_error), message);
+        showException(DashboardActivity.dashboardActivity.getString(R.string.server_version_error),
+                message);
         setIsInvalidServerDialogShowed(true);
     }
 

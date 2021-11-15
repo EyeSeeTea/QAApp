@@ -41,10 +41,11 @@ captures/
 /.idea/workspace.xml
 /.idea/libraries
 .DS_Store
-app/fabric.properties
 
 # last commit file
 app/src/main/res/raw/lastcommit.txt
 
 # local only private key for drive service account credentials
 app/src/*/res/raw/driveserviceprivatekey.json
+app/src/*/res/raw/config.json
+/app.tar

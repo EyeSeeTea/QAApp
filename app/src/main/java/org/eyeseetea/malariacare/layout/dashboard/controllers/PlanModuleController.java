@@ -19,25 +19,20 @@
 
 package org.eyeseetea.malariacare.layout.dashboard.controllers;
 
-import android.support.v4.app.FragmentTransaction;
+import androidx.fragment.app.FragmentTransaction;
 import android.util.Log;
 import android.view.View;
 
 import org.eyeseetea.malariacare.DashboardActivity;
 import org.eyeseetea.malariacare.R;
-import org.eyeseetea.malariacare.data.database.model.OrgUnitDB;
-import org.eyeseetea.malariacare.data.database.model.ProgramDB;
 import org.eyeseetea.malariacare.data.database.utils.PreferencesState;
+import org.eyeseetea.malariacare.fragments.IModuleFragment;
 import org.eyeseetea.malariacare.fragments.PlannedFragment;
 import org.eyeseetea.malariacare.fragments.PlannedPerOrgUnitFragment;
 import org.eyeseetea.malariacare.layout.dashboard.config.ModuleSettings;
-import org.eyeseetea.malariacare.views.filters.OrgUnitProgramFilterView;
 
 public class PlanModuleController extends ModuleController {
     private static final String TAG = ".PlanModuleCOntroller";
-    PlannedPerOrgUnitFragment plannedOrgUnitsFragment;
-
-    OrgUnitProgramFilterView orgUnitProgramFilterView;
 
     public PlanModuleController(ModuleSettings moduleSettings) {
         super(moduleSettings);
@@ -51,55 +46,8 @@ public class PlanModuleController extends ModuleController {
     @Override
     public void init(DashboardActivity activity) {
         super.init(activity);
-        createFilters();
-        orgUnitVisibility(View.GONE);
-        programVisibility(View.VISIBLE);
-        fragment = new PlannedFragment();
-    }
 
-    private void createFilters() {
-
-        orgUnitProgramFilterView =
-                (OrgUnitProgramFilterView) DashboardActivity.dashboardActivity
-                        .findViewById(R.id.plan_org_unit_program_filter_view);
-
-        orgUnitProgramFilterView.setFilterType(OrgUnitProgramFilterView.FilterType.EXCLUSIVE);
-
-        orgUnitProgramFilterView.setFilterChangedListener(
-                        new OrgUnitProgramFilterView.FilterChangedListener() {
-                            @Override
-                            public void onProgramFilterChanged(ProgramDB programFilter) {
-                                saveCurrentFilters();
-
-                                DashboardActivity.dashboardActivity.onProgramSelected(programFilter);
-
-                            }
-
-                            @Override
-                            public void onOrgUnitFilterChanged(OrgUnitDB orgUnitFilter) {
-                                saveCurrentFilters();
-
-                                if (orgUnitFilter.getName().equals(
-                                        PreferencesState.getInstance().getContext().getResources()
-                                                .getString(R.string.filter_all_org_units))){
-                                    DashboardActivity.dashboardActivity.onProgramSelected(
-                                            orgUnitProgramFilterView.getSelectedProgramFilter()
-                                    );
-                                }else {
-                                    DashboardActivity.dashboardActivity.onOrgUnitSelected(
-                                            orgUnitFilter);
-                                }
-
-
-                            }
-                        });
-    }
-
-    private void saveCurrentFilters() {
-        PreferencesState.getInstance().setProgramUidFilter(
-                orgUnitProgramFilterView.getSelectedProgramFilter().getUid());
-        PreferencesState.getInstance().setOrgUnitUidFilter(
-                orgUnitProgramFilterView.getSelectedOrgUnitFilter().getUid());
+        fragment = PlannedFragment.newInstance(server.getClassification());
     }
 
     public boolean isVisible() {
@@ -110,56 +58,31 @@ public class PlanModuleController extends ModuleController {
         return !PreferencesState.getInstance().isHidePlanningTab();
     }
 
-
-    public void onOrgUnitSelected(OrgUnitDB orgUnit) {
+    public void onOrgUnitSelected(String orgUnitUid) {
         Log.d(TAG, "onOrgUnitSelected");
-        //hide plannedFragment layout and show plannedOrgUnitsFragment
-        programVisibility(View.GONE);
-        orgUnitVisibility(View.VISIBLE);
 
-        if (plannedOrgUnitsFragment == null) {
-            plannedOrgUnitsFragment = new PlannedPerOrgUnitFragment();
-        }
-        plannedOrgUnitsFragment.setOrgUnitFilter(orgUnit.getUid());
+        fragment = new PlannedPerOrgUnitFragment();
+
         FragmentTransaction ft = getFragmentTransaction();
-        ft.replace(R.id.dashboard_planning_orgunit, plannedOrgUnitsFragment);
-        ft.commit();
-        plannedOrgUnitsFragment.reloadData();
-    }
+        ft.replace(R.id.dashboard_planning_init, fragment);
+        ft.commitAllowingStateLoss();
 
-
-    public void onProgramSelected(ProgramDB program) {
-        Log.d(TAG, "onProgramSelected");
-        if (DashboardActivity.dashboardActivity.findViewById(
-                R.id.dashboard_planning_orgunit).getVisibility() == View.VISIBLE) {
-            //hide plannedFragment layout and show plannedOrgUnitsFragment
-            orgUnitVisibility(View.GONE);
-            programVisibility(View.VISIBLE);
-
-
-            if (fragment == null) {
-                fragment = new PlannedFragment();
-            }
-
-            FragmentTransaction ft = getFragmentTransaction();
-            ft.replace(R.id.dashboard_planning_init, fragment);
-            ft.commit();
-            if (program != null) {
-                ((PlannedFragment) fragment).reloadFilter();
-            }
-        } else {
-            ((PlannedFragment) fragment).reloadFilter();
+        if (orgUnitUid != null) {
+            ((IModuleFragment) fragment).reloadData();
         }
 
     }
 
-    private void programVisibility(int visibility) {
-        DashboardActivity.dashboardActivity.findViewById(
-                R.id.dashboard_planning_init).setVisibility(visibility);
-    }
+    public void onProgramSelected(String programUid) {
+        Log.d(TAG, "onProgramSelected");
 
-    private void orgUnitVisibility(int visibility) {
-        DashboardActivity.dashboardActivity.findViewById(
-                R.id.dashboard_planning_orgunit).setVisibility(visibility);
+            fragment = PlannedFragment.newInstance(server.getClassification());
+
+        FragmentTransaction ft = getFragmentTransaction();
+        ft.replace(R.id.dashboard_planning_init, fragment);
+        ft.commitAllowingStateLoss();
+        if (programUid != null) {
+            ((IModuleFragment) fragment).reloadData();
+        }
     }
 }

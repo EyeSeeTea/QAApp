@@ -22,25 +22,55 @@ package org.eyeseetea.malariacare.layout.dashboard.controllers;
 import org.eyeseetea.malariacare.DashboardActivity;
 import org.eyeseetea.malariacare.R;
 import org.eyeseetea.malariacare.data.database.utils.PreferencesState;
+import org.eyeseetea.malariacare.fragments.MonitorBySurveyActionsFragment;
 import org.eyeseetea.malariacare.fragments.MonitorFragment;
 import org.eyeseetea.malariacare.layout.dashboard.config.ModuleSettings;
 
-/**
- * Created by idelcano on 25/02/2016.
- */
 public class MonitorModuleController extends ModuleController {
 
-    public MonitorModuleController(ModuleSettings moduleSettings){
+    MonitorBySurveyActionsFragment monitorBySurveyActionsFragment;
+    MonitorFragment monitoringByCalendar;
+
+    public MonitorModuleController(ModuleSettings moduleSettings) {
         super(moduleSettings);
-        this.tabLayout=R.id.tab_monitor_layout;
+        this.tabLayout = R.id.tab_monitor_layout;
     }
 
     @Override
     public void init(DashboardActivity activity) {
         super.init(activity);
-        MonitorFragment monitorFragment=new MonitorFragment();
-        monitorFragment.setFilterType(moduleSettings.getMonitorFilter());
-        fragment = monitorFragment;
+
+        monitorBySurveyActionsFragment =
+                MonitorBySurveyActionsFragment.newInstance(server.getClassification());
+
+        monitoringByCalendar = MonitorFragment.newInstance(server.getClassification());
+        monitoringByCalendar.setFilterType(moduleSettings.getMonitorFilter());
+
+
+        String selectedProgramUidFilter = PreferencesState.getInstance().getProgramUidFilter();
+        String selectedOrgUnitUidFilter = PreferencesState.getInstance().getOrgUnitUidFilter();
+
+        if (selectedOrgUnitUidFilter.equals("") && selectedProgramUidFilter.equals("")){
+            fragment = monitorBySurveyActionsFragment;
+
+        } else {
+            fragment = monitoringByCalendar;
+        }
     }
 
+    public void openMonitoringByCalendar() {
+        fragment = monitoringByCalendar;
+
+        replaceFragment(R.id.dashboard_charts_container, monitoringByCalendar);
+
+        reloadData();
+    }
+
+    public void openMonitorByActions() {
+        fragment = monitorBySurveyActionsFragment;
+
+        replaceFragment(R.id.dashboard_charts_container, monitorBySurveyActionsFragment);
+
+        reloadData();
+    }
 }

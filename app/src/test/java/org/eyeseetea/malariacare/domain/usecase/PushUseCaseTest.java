@@ -24,14 +24,18 @@ import static org.hamcrest.core.Is.is;
 import static org.junit.Assert.assertThat;
 import static org.mockito.Mockito.when;
 
-import org.eyeseetea.malariacare.data.database.iomodules.dhis.exporter.PushController;
+import org.eyeseetea.malariacare.data.database.iomodules.dhis.exporter.PushDataController;
 import org.eyeseetea.malariacare.domain.boundary.IPushController;
 import org.eyeseetea.malariacare.domain.boundary.executors.IAsyncExecutor;
 import org.eyeseetea.malariacare.domain.boundary.executors.IMainExecutor;
 import org.eyeseetea.malariacare.domain.boundary.repositories.IServerInfoRepository;
+import org.eyeseetea.malariacare.domain.boundary.repositories.UserFailure;
+import org.eyeseetea.malariacare.domain.boundary.repositories.UserRepository;
+import org.eyeseetea.malariacare.domain.common.Either;
 import org.eyeseetea.malariacare.domain.entity.Credentials;
 import org.eyeseetea.malariacare.domain.entity.ServerInfo;
 import org.eyeseetea.malariacare.domain.common.ReadPolicy;
+import org.eyeseetea.malariacare.domain.entity.User;
 import org.junit.Rule;
 import org.junit.Test;
 import org.mockito.Mock;
@@ -62,7 +66,7 @@ public class PushUseCaseTest {
                 runnable.run();
             }
         };
-        Credentials credentials = new Credentials("", "", "");
+        Credentials credentials = new Credentials("serverURL", "username", "password");
         IServerInfoRepository serverInfoRepository = new IServerInfoRepository() {
             @Override
             public ServerInfo getServerInfo(ReadPolicy readPolicy) throws Exception {
@@ -75,12 +79,19 @@ public class PushUseCaseTest {
             }
         };
 
-        PushUseCase pushUseCase = new PushUseCase(mPushController, mainExecutor, asyncExecutor, serverInfoRepository);
+        UserRepository userRepository = new UserRepository() {
+            @Override
+            public Either<UserFailure, User> getCurrent() {
+                return null;
+            }
+        };
+
+        PushUseCase pushUseCase = new PushUseCase(mPushController, mainExecutor, asyncExecutor, serverInfoRepository,userRepository);
 
         pushUseCase.execute(credentials, new PushUseCase.Callback() {
 
             @Override
-            public void onComplete(PushController.Kind kind) {
+            public void onComplete(PushDataController.Kind kind) {
                 callbackInvoked(false);
             }
 
@@ -116,6 +127,11 @@ public class PushUseCaseTest {
 
             @Override
             public void onServerVersionError() {
+                callbackInvoked(false);
+            }
+
+            @Override
+            public void onRequiredAuthorityError(String authority) {
                 callbackInvoked(false);
             }
         });

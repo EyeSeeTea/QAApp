@@ -17,6 +17,8 @@
 <string name="settings_menu_about">"អំពី"</string>
 <string name="settings_menu_configuration">"ការ​កំណត់ "</string>
 <string name="settings_menu_licence">"អាជ្ញាប័ណ្ណ"</string>
+<string name="settings_menu_learning_center">"មជ្ឈមណ្ឌលសិក្សារបស់ HNQIS"</string>
+<string name="settings_menu_submit_ticket">"ដាក់សំបុត្រ"</string>
 <string name="settings_menu_logout">"ចាកចេញ"</string>
 
 <!-- # dialogs -->
@@ -131,15 +133,17 @@
 <string name="dashboard_title_planned_type_overdue">"ហួសកំណត់"</string>
 <string name="dashboard_title_planned_type_next_30">"30 ថ្ងៃបន្ទាប់"</string>
 <string name="dashboard_title_planned_type_future">"អនាគត"</string>
-<string name="dashboard_title_planned_productivity">"Prd"</string>
-<string name="dashboard_title_planned_quality_of_care">"QoC"</string>
+<string name="dashboard_title_planned_productivity_abreviation">"Prd"</string>
+<string name="dashboard_title_planned_productivity">"ផលិតភាព"</string>
+<string name="competency_title">"សមត្ថកិច្ច"</string>
 <string name="dashboard_title_planned_next_qa">"QA បន្ទាប់"</string>
+<string name="assessment_sent_competency">"សមត្ថកិច្ច"</string>
 <string name="feedback_show_only_failed">"បង្ហាញតែសំណួរដែលបរាជ័យ"</string>
 <string name="feedback_show_only_media">"បង្ហាញតែសំណួរដែលមានវីដេអូ / រូបភាព"</string>
 <string name="feedback_show_only_one_or_show_all">"បង្ហាញតែមតិយោបល់ចុងក្រោយក្នុងមួយកម្មវិធី / PUll"</string>
 <string name="feedback_return">"ត្រឡប់ទៅការស្ទង់មតិទាំងអស់"</string>
-<string name="quality_of_care">"គុណភាពនៃការថែរក្សា (QoC) ពិន្ទុ:"</string>
-<string name="overall_quality_of_care">ពិន្ទុគុណភាពថែរក្សាសរុប (QoC): "</string>
+<string name="quality_of_care">"គុណភាពនៃការថែរក្សា (QoC) ពិន្ទុ"</string>
+<string name="overall_quality_of_care">QoC"</string>
 <string name="feedback_info_passed">"ហុច"</string>
 <string name="feedback_info_failed">"មិនជោគជ័យ"</string>
 <string name="feedback_info_not_answered">"NA"</string>
@@ -155,7 +159,6 @@
 <string name="server_url">"DHIS2 server"</string>
 <string name="settings_text_dhis_password">"ពាក្យសម្ងាត់ DHIS"</string>
 <string name="settings_text_dhis_max_items">"DHIS អតិបរមាការស្ទង់មតិបានផ្ទុក"</string>
-<string name="settings_monitoring_target">"គោលដៅតាមដាន"</string>
 <string name="dialog_error_push_uids">"UID ដែលមិនត្រឹមត្រូវបានរកឃើញក្នុងការរុញ"</string>
 <string name="dialog_error_push_no_location_and_required">"គ្មានទីតាំងដែលអាចប្រើបានទេហើយវាជាវាលចាំបាច់"</string>
 <string name="dialog_info_push_imported">"បាននាំចូល"</string>
@@ -198,7 +201,7 @@
 <string name="error_message_push">"ព្រឹត្តិការណ៍នេះជាមួយនឹងលេខសម្គាល់អ្នកប្រើ %s ។ ត្រូវបានផ្ទុកឡើងដោយគ្មានកាលបរិច្ឆេទ។ សូមទាក់ទងអ្នកគ្រប់គ្រង។"</string>
 <string name="monitor_js_assessments">"ការស្ទង់មតិធ្វើឡើង"</string>
 <string name="monitor_js_target">"\"គោលដៅ\""</string>
-<string name="monitor_js_quality_of_care">"\"គុណភាពនៃការថែទាំ: មុន \""</string>
+<string name="monitor_js_quality_of_care">"ថ្នាក់សមត្ថភាព -"</string>
 <string name="monitor_js_months">"\" ខែ\""</string>
 <string name="monitor_js_multiple_event_legend" >"(*) ការស្ទង់មតិច្រើនជាងមួយមាននៅក្នុងខែដដែល"</string>
 <string name="dialog_error_attribute_null">"\"លេខសម្គាល់គុណលក្ខណៈជាមួយ NULL% s សូមទាក់ទងអ្នកគ្រប់គ្រងម៉ាស៊ីនបម្រើរបស់អ្នក.\""</string>
@@ -217,6 +220,7 @@
 <string name="developer_option_summary">"ជម្រើសនេះអនុញ្ញាតជម្រើសអភិវឌ្ឍន៍"</string>
 <string name="developer_option_title">"អភិវឌ្ឍន៍បង្ហាញជម្រើស"</string>
 <string name="export_data_option_title">"មូលដ្ឋានទិន្នន័យដែលបាននាំចេញ"</string>
+<string name="export_data_to_local_option_title">នាំចេញមូលដ្ឋានទិន្នន័យទៅឧបករណ៍ផ្ទុកក្នុងមូលដ្ឋាន</string>
 <string name="progress_pull_validating_composite_scores">"សុពលភាពពិន្ទុសមាសធាតុ ..."</string>
 <string name="admin_announcement">"សេចក្តីប្រកាស admin"</string>
 <string name="user_close">"អ្នកប្រើប្រាស់នេះត្រូវបានបិទដោយអ្នកគ្រប់គ្រង។"</string>
@@ -244,23 +248,7 @@
 <string name="plan_action_title">ការសង្ក្រតនិងផែនការសកម្មភាព</string>
 <string name="plan_action_today_date">បានបញ្ចប់: %s</string>
 <string name="plan_action_next_date">ការវាយតម្លៃក្រោយ: %s</string>
-<string name="plan_action_description">រៀបរាប់ពីអ្វីដែលបានគេសង្កេតឃើញក្នុងអំឡុងពេលដំណើរទស្សនកិច្ចផែនការសកម្មភាពជាក់លាក់មួយសម្រាប់ការដោះស្រាយគម្លាតនេះ។ ចំណាំផងដែរប្រសើរជាងគម្លាតកំណត់អត្តសញ្ញាណក្នុងអំឡុងដំណើរទស្សនកិច្ចចុងក្រោយនេះជាមួយ</string>
-<string name="plan_action_gasp_title">គម្លាត:</string>
-<string name="plan_action_action_plan_title">ផែនការសកម្មភាព:</string>
-<string name="plan_action_action_title">សកម្មភាព:</string>
-<string-array name="plan_action_dropdown_options">
-<item>"..."</item>
-<item>ការបណ្តុះបណ្តាលបំប៉នក្នុងអំឡុងពេល SSV</item>
-<item>បណ្តុះបណ្តារំលឹកជាក្រុមនៅថ្ងៃក្រោយ</item>
-<item>ផែនការសកម្មភាព CME</item>
-<item>បង្ហាញពីបច្ចេកទេសជាមួយអតិថិជន</item>
-<item>ផ្សេងទៀត</item>
-</string-array>
-<string-array name="plan_action_dropdown_suboptions">
-<item>...</item>
-<item>មើលវីដេអូ</item>
-<item>អនុវត្តបច្ចេកទេសបានត្រឹមត្រូវនៅពេលដែលការបញ្ចូលនៃដំណើរទស្សនកិច្ច</item>
-</string-array>
+<string name="plan_action_action_plan_title">ផែនការសកម្មភាព</string>
 <string name="supervision_on">ការត្រួតពិនិត្យលទ្ធផលលើ:</string>
 <string name="critical_steps">ជំហានរិះគន់ខកខាន:</string>
 <string name="url_not_available">URL ឆ្លើយតបមិនមានទេពីព្រោះការស្ទង់មតិមិនត្រូវបានផ្ញើទៅម៉ាស៊ីនមេនៅឡើយទេ។ ព្យាយាមចែករំលែកមតិត្រឡប់ម្តងទៀតពេលក្រោយ។</string>
@@ -281,6 +269,8 @@
 <string name="html_text">"អត្ថបទដែលបានធ្វើទ្រង់ទ្រាយ "</string>
 <string name="schedule_title">"កំណត់កាលវិភាគស្ទង់មតិ"</string>
 <string name="monitor_no_surveys_to_show">"គ្មានការស្ទង់មតិដើម្បីបង្ហាញ"</string>
+<string name="plan_action_critical_steps_missed_title">"ជំហានសំខាន់ៗត្រូវបានគេរំលង:"</string>
+<string name="plan_action_non_critical_steps_missed_title" >"ជំហានមិនសំខាន់:"</string>
 <string name="plan_action_provider_title" >"ឈ្មោះក្រុមហ៊ុនផ្ដល់:"</string>
 <string name="health_facility">មជ្ឈមណ្ឌលវេជ្ជសាស្ត្រ</string>
 <string name="mandatory">"ចាំបាច់"</string>
@@ -307,4 +297,26 @@
 <string name="login_error_unsupported_server_version">កំណែម៉ាស៊ីនមេមិនត្រូវបានគាំទ្រទេ</string>
 <string name="feedback_not_sent">"URL ឆ្លើយតបមិនមានទេដោយសារតែការស្ទង់មតិ។ ព្យាយាមចែករំលែកមតិត្រឡប់ម្តងទៀតនៅពេលក្រោយ។"</string>
 <string name="recommend_upgrade">"សូមដំឡើងកំណែកម្មវិធីពី Google Play ។"</string>
+
+
+<string name="competency_classification_not_available_name">មិនអាច</string>
+<string name="competency_classification_competent_name">មានសមត្ថភាព</string>
+<string name="competency_classification_competent_improvement_name">មានសមត្ថភាពប៉ុន្តែត្រូវការភាពប្រសើរឡើង</string>
+<string name="competency_classification_not_competent_name">មិនមានសមត្ថភាព</string>
+
+<string name="competency_classification_not_available_description">NA = មិនអាចប្រើបាន។ ការស្ទង់មតិដែលបានបង្កើតនៅលើកំណែកម្មវិធីចុងក្រោយនិងសមត្ថភាពមិនមាន</string>
+<string name="competency_classification_competent_description">C = មានសមត្ថកិច្ច។ អ្នកផ្តល់សេវានេះបានបំពេញតាមជំហានសំខាន់ៗទាំងអស់និង≥ 90% នៃជំហានមិនសំខាន់</string>
+<string name="competency_classification_competent_improvement_description">CNI = មានសមត្ថកិច្ចប៉ុន្តែត្រូវការភាពប្រសើរឡើង។ អ្នកផ្តល់សេវាបានបំពេញតាមជំហានសំខាន់ៗទាំងអស់ប៉ុន្តែវាមានចន្លោះពី 80% និង 90% នៃជំហានមិនសំខាន់</string>
+<string name="competency_classification_not_competent_description">NC = មិនមានសមត្ថភាព។ អ្នកផ្តល់សេវាបានខកខានយ៉ាងហោចណាស់ជំហានសំខាន់មួយឬក្នុងករណីដែលមិនមានជំហានសំខាន់ៗតិចជាងជំហានមិនសំខាន់ចំនួនតិចជាង 80%</string>
+
+<string name="competency_classification_not_available_abbreviation">NA</string>
+<string name="competency_classification_competent_abbreviation">C</string>
+<string name="competency_classification_competent_improvement_abbreviation">CNI</string>
+<string name="competency_classification_not_competent_abbreviation">NC</string>
+
+<string name="productivity_low_name">ទាប</string>
+<string name="productivity_high_name">ខ្ពស់</string>
+
+<string name="export_db_to_local_success_message">បាននាំចេញដោយជោគជ័យដើម្បីទាញយកថត</string>
+<string name="export_db_to_local_error_message">មានកំហុសកើតឡើងនៅពេលនាំចេញមូលដ្ឋានទិន្នន័យ</string>
 </resources>

@@ -30,8 +30,9 @@ import android.location.Location;
 import android.location.LocationManager;
 import android.net.Uri;
 import android.os.Bundle;
-import android.support.v4.content.ContextCompat;
-import android.support.v7.app.AppCompatActivity;
+import androidx.core.app.ActivityCompat;
+import androidx.core.content.ContextCompat;
+import androidx.appcompat.app.AppCompatActivity;
 import android.util.Log;
 import android.view.Menu;
 import android.view.MenuItem;
@@ -40,21 +41,25 @@ import android.widget.Toast;
 
 import org.eyeseetea.malariacare.data.database.datasources.ServerInfoLocalDataSource;
 import org.eyeseetea.malariacare.data.database.iomodules.dhis.importer.LocalPullController;
-import org.eyeseetea.malariacare.data.database.model.ObsActionPlanDB;
+import org.eyeseetea.malariacare.data.database.model.ObservationDB;
 import org.eyeseetea.malariacare.data.database.model.SurveyDB;
 import org.eyeseetea.malariacare.data.database.utils.ExportData;
 import org.eyeseetea.malariacare.data.database.utils.LanguageContextWrapper;
 import org.eyeseetea.malariacare.data.database.utils.LocationMemory;
 import org.eyeseetea.malariacare.data.database.utils.PreferencesState;
-import org.eyeseetea.malariacare.data.database.utils.Session;
 import org.eyeseetea.malariacare.data.remote.api.ServerInfoRemoteDataSource;
 import org.eyeseetea.malariacare.data.repositories.ServerInfoRepository;
 import org.eyeseetea.malariacare.data.repositories.UserAccountRepository;
+import org.eyeseetea.malariacare.data.sync.IData;
 import org.eyeseetea.malariacare.domain.boundary.repositories.IServerInfoRepository;
 import org.eyeseetea.malariacare.domain.boundary.repositories.IUserAccountRepository;
+import org.eyeseetea.malariacare.domain.common.Either;
+import org.eyeseetea.malariacare.domain.entity.Server;
 import org.eyeseetea.malariacare.domain.entity.ServerInfo;
 import org.eyeseetea.malariacare.domain.usecase.GetServerInfoUseCase;
+import org.eyeseetea.malariacare.domain.usecase.GetServerUseCase;
 import org.eyeseetea.malariacare.domain.usecase.LogoutUseCase;
+import org.eyeseetea.malariacare.factories.ServerFactory;
 import org.eyeseetea.malariacare.layout.dashboard.builder.AppSettingsBuilder;
 import org.eyeseetea.malariacare.layout.listeners.SurveyLocationListener;
 import org.eyeseetea.malariacare.layout.utils.LayoutUtils;
@@ -62,9 +67,9 @@ import org.eyeseetea.malariacare.presentation.executors.AsyncExecutor;
 import org.eyeseetea.malariacare.presentation.executors.UIThreadExecutor;
 import org.eyeseetea.malariacare.receivers.AlarmPushReceiver;
 import org.eyeseetea.malariacare.utils.AUtils;
-import org.eyeseetea.malariacare.utils.Constants;
 
 import java.io.IOException;
+import java.util.ArrayList;
 import java.util.List;
 
 public abstract class BaseActivity extends AppCompatActivity {
@@ -93,14 +98,14 @@ public abstract class BaseActivity extends AppCompatActivity {
         mUserAccountRepository = new UserAccountRepository(this);
         mLogoutUseCase = new LogoutUseCase(mUserAccountRepository);
         IServerInfoRepository serverStatusRepository = new ServerInfoRepository(new ServerInfoLocalDataSource(getApplicationContext()),
-                new ServerInfoRemoteDataSource(Session.getCredentials()));
+                new ServerInfoRemoteDataSource(this));
         GetServerInfoUseCase serverStatusUseCase = new GetServerInfoUseCase(serverStatusRepository,
                 new UIThreadExecutor(), new AsyncExecutor());
         serverStatusUseCase.execute(new GetServerInfoUseCase.Callback() {
             @Override
             public void onComplete(ServerInfo serverInfo) {
-                if(serverInfo.isServerSupported()){
-                    checkQuarantineSurveys();
+                if (serverInfo.isServerSupported()) {
+                    checkQuarantineData();
                     alarmPush = new AlarmPushReceiver();
                     alarmPush.setPushAlarm(getApplicationContext());
                 }
@@ -108,24 +113,19 @@ public abstract class BaseActivity extends AppCompatActivity {
         });
     }
 
-    public void cancelAlarm() {
-        alarmPush.cancelPushAlarm(this);
+    private void checkQuarantineData() {
+        PreferencesState.getInstance().setPushInProgress(false);
+
+        List<IData> surveys = new ArrayList<IData>(SurveyDB.getAllSendingSurveys());
+        ChangeSatusToQuarantine(surveys);
+
+        List<IData> observations = new ArrayList<IData>(ObservationDB.getAllSendingObservations());
+        ChangeSatusToQuarantine(observations);
     }
 
-    private void checkQuarantineSurveys() {
-        PreferencesState.getInstance().setPushInProgress(false);
-        List<SurveyDB> surveys = SurveyDB.getAllSendingSurveys();
-        Log.d(TAG + "B&D", "Pending surveys sending: "
-                + surveys.size());
-        for (SurveyDB survey : surveys) {
-            survey.setStatus(Constants.SURVEY_QUARANTINE);
-            survey.save();
-        }
-        List<ObsActionPlanDB> obsActionPlens = ObsActionPlanDB.getAllSendingObsActionPlans();
-        for (ObsActionPlanDB obsActionPlan : obsActionPlens) {
-            //Obs action plan doesn't need quarantine status. This type of element only overwritte the server survey.
-            obsActionPlan.setStatus(Constants.SURVEY_COMPLETED);
-            obsActionPlan.save();
+    private void ChangeSatusToQuarantine(List<IData> dataList) {
+        for (IData data : dataList) {
+            data.changeStatusToQuarantine();
         }
     }
 
@@ -133,13 +133,29 @@ public abstract class BaseActivity extends AppCompatActivity {
      * Common styling
      */
     private void initView(Bundle savedInstanceState) {
-        setTheme(R.style.EyeSeeTheme);
-        android.support.v7.app.ActionBar actionBar = this.getSupportActionBar();
-        LayoutUtils.setActionBarLogo(actionBar);
+        GetServerUseCase getServerUseCase = ServerFactory.INSTANCE.provideGetServerUseCase(this);
 
-        if (savedInstanceState == null) {
-            initTransition();
-        }
+        getServerUseCase.execute(serverResult -> {
+            setTheme(R.style.EyeSeeTheme);
+            androidx.appcompat.app.ActionBar actionBar = BaseActivity.this.getSupportActionBar();
+
+            if (serverResult.isLeft()){
+                LayoutUtils.setActionBarLogo(actionBar);
+            } else {
+                Server server = ((Either.Right<Server>) serverResult).getValue();
+
+                if (server.isDataCompleted()) {
+                    LayoutUtils.setActionBarLogo(this, actionBar, server.getLogo());
+                } else {
+                    LayoutUtils.setActionBarLogo(actionBar);
+                }
+            }
+
+
+            if (savedInstanceState == null) {
+                initTransition();
+            }
+        });
     }
 
     /**
@@ -204,14 +220,76 @@ public abstract class BaseActivity extends AppCompatActivity {
                     startActivityForResult(emailIntent, DUMP_REQUEST_CODE);
                 }
                 break;
+            case R.id.export_db_local_storage:
+                exportDBToLocalStorage();
+                break;
             case R.id.import_db:
                 debugMessage("Import db");
                 showFileChooser();
+                break;
+            case R.id.learning_center:
+                debugMessage("learning center");
+                navigateToUrl(getString(R.string.learning_center_url));
+                break;
+            case R.id.submit_ticket:
+                debugMessage("submit ticket");
+                navigateToUrl(getString(R.string.submit_ticket_url));
                 break;
             default:
                 return super.onOptionsItemSelected(item);
         }
         return true;
+    }
+
+    private void navigateToUrl(String url) {
+        Intent browserIntent = new Intent(Intent.ACTION_VIEW, Uri.parse(url));
+        startActivity(browserIntent);
+    }
+
+    private static final int MY_WRITE_EXTERNAL_STORAGE = 1;
+
+    private void exportDBToLocalStorage() {
+        if (ContextCompat.checkSelfPermission(this,
+                Manifest.permission.WRITE_EXTERNAL_STORAGE)
+                != PackageManager.PERMISSION_GRANTED) {
+            ActivityCompat.requestPermissions(this,
+                    new String[]{Manifest.permission.WRITE_EXTERNAL_STORAGE},
+                    MY_WRITE_EXTERNAL_STORAGE);
+        } else {
+            exportDBToLocalAndShowResult();
+        }
+    }
+
+    private void exportDBToLocalAndShowResult() {
+        debugMessage("Export db to local storage");
+        boolean resultOK = ExportData.dumpAndExportToLocalStorage(this);
+
+        if (resultOK) {
+            Toast.makeText(this, ExportData.EXPORT_DATA_FILE + " " +
+                            getString(R.string.export_db_to_local_success_message),
+                    Toast.LENGTH_LONG).show();
+        } else {
+            Toast.makeText(this, getString(R.string.export_db_to_local_error_message),
+                    Toast.LENGTH_LONG).show();
+        }
+    }
+
+
+    @Override
+    public void onRequestPermissionsResult(int requestCode,
+            String permissions[], int[] grantResults) {
+        switch (requestCode) {
+            case MY_WRITE_EXTERNAL_STORAGE: {
+                // If request is cancelled, the result arrays are empty.
+                if (grantResults.length > 0
+                        && grantResults[0] == PackageManager.PERMISSION_GRANTED) {
+
+                    exportDBToLocalAndShowResult();
+                }
+                return;
+            }
+        }
+
     }
 
     private static final int FILE_SELECT_CODE = 0;
@@ -269,6 +347,8 @@ public abstract class BaseActivity extends AppCompatActivity {
                 || !AppSettingsBuilder.isDeveloperOptionsActive()) {
             MenuItem item = menu.findItem(R.id.export_db);
             item.setVisible(false);
+            item = menu.findItem(R.id.export_db_local_storage);
+            item.setVisible(false);
             item = menu.findItem(R.id.import_db);
             item.setVisible(false);
         }
@@ -307,9 +387,8 @@ public abstract class BaseActivity extends AppCompatActivity {
     }
 
     protected void goSettings() {
-        Intent intentSettings = new Intent(this, SettingsActivity.class);
-        intentSettings.putExtra(SETTINGS_CALLER_ACTIVITY, this.getClass());
-        startActivity(new Intent(this, SettingsActivity.class));
+        Intent intent = new Intent(this, SettingsActivity.class);
+        ActivityCompat.startActivity(this, intent, null);
     }
 
     /**
@@ -344,6 +423,7 @@ public abstract class BaseActivity extends AppCompatActivity {
         mLogoutUseCase.execute(new LogoutUseCase.Callback() {
             @Override
             public void onLogoutSuccess() {
+                AlarmPushReceiver.cancelPushAlarm(BaseActivity.this);
                 finishAndGo(LoginActivity.class);
             }
 

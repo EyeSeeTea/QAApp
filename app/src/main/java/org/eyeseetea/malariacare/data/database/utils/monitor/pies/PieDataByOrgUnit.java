@@ -22,26 +22,15 @@ package org.eyeseetea.malariacare.data.database.utils.monitor.pies;
 import org.eyeseetea.malariacare.data.database.model.OrgUnitDB;
 import org.eyeseetea.malariacare.utils.AUtils;
 
-/**
- * Created by idelcano on 23/08/2016.
- */
 public class PieDataByOrgUnit extends PieDataBase {
-    /**
-     * Type of program for this chart
-     */
     private OrgUnitDB orgUnit;
 
-
-    /**
-     * Constructor per OrgUnit
-     * @param orgUnit
-     */
     public PieDataByOrgUnit(OrgUnitDB orgUnit) {
         this.orgUnit=orgUnit;
     }
     public String toJSON(String tipChat){
         String pieTitle = String.format("%s (%s)", AUtils.escapeQuotes(orgUnit.getName()), orgUnit.getId_org_unit());
-        String json = String.format(JSONFORMAT, pieTitle, tipChat, orgUnit.getId_org_unit(), this.numA, this.numB, this.numC, orgUnit.getUid(), orgUnit.getUid());
+        String json = String.format(JSONFORMAT, pieTitle, tipChat, orgUnit.getId_org_unit(), this.numA, this.numB, this.numC, this.numNA, orgUnit.getUid(), orgUnit.getUid());
         return json;
     }
 }

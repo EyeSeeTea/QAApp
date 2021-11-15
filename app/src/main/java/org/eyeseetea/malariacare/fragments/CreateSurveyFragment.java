@@ -27,8 +27,8 @@ import android.content.IntentFilter;
 import android.content.SharedPreferences;
 import android.os.Bundle;
 import android.preference.PreferenceManager;
-import android.support.v4.app.Fragment;
-import android.support.v4.content.LocalBroadcastManager;
+import androidx.fragment.app.Fragment;
+import androidx.localbroadcastmanager.content.LocalBroadcastManager;
 import android.util.Log;
 import android.view.LayoutInflater;
 import android.view.View;
@@ -222,9 +222,10 @@ public class CreateSurveyFragment extends Fragment {
         //set the first orgUnit saved
 
 
-        OrgUnitDB filteredOrgUnit = filter.getSelectedOrgUnitFilter();
-        if(filteredOrgUnit!=null) {
-            orgUnitStorage = filteredOrgUnit.getUid();
+        String orgunitUidFilter = filter.getSelectedOrgUnitFilter();
+
+        if(orgunitUidFilter!=null) {
+            orgUnitStorage = orgunitUidFilter;
         }else {
             if (orgUnitHierarchy.getSavedUidsList().length() > 1) {
                 orgUnitStorage = orgUnitHierarchy.getSavedUidsList().split(TOKEN)[0];
@@ -474,8 +475,9 @@ public class CreateSurveyFragment extends Fragment {
         programView.setAdapter(new ProgramArrayAdapter( getActivity(), initProgram));
         ProgramDB lastSelectedProgram= getLastSelectedProgram();
 
-        ProgramDB filteredProgram = filter.getSelectedProgramFilter();
-        if(filteredProgram!=null){
+        String programUidFilter = filter.getSelectedProgramFilter();
+        if(!programUidFilter.isEmpty()){
+            ProgramDB filteredProgram = ProgramDB.getProgram(programUidFilter);
             programView.setSelection(getIndex(programView, filteredProgram.getName()));
         }else {
             if (lastSelectedProgram != null) {
@@ -608,7 +610,10 @@ public class CreateSurveyFragment extends Fragment {
             for (OrgUnitDB orgUnit : selectedHierarchy) {
                 orgUnitList += orgUnit.getUid() + TOKEN;
             }
-            orgUnitList=orgUnitList.substring(0,orgUnitList.lastIndexOf(TOKEN));
+
+            if (orgUnitList.lastIndexOf(TOKEN) != -1){
+                orgUnitList=orgUnitList.substring(0,orgUnitList.lastIndexOf(TOKEN));
+            }
 
             saveOrgUnitList(orgUnitList);
             return orgUnitList;
@@ -626,7 +631,9 @@ public class CreateSurveyFragment extends Fragment {
         }
 
         public OrgUnitDB getLastSelected() {
-            OrgUnitDB filteredOrgUnit = filter.getSelectedOrgUnitFilter();
+
+            OrgUnitDB filteredOrgUnit =OrgUnitDB.getOrgUnit(filter.getSelectedOrgUnitFilter());
+
             if(filteredOrgUnit!=null && filteredOrgUnit.getUid()!=null) {
                 return filteredOrgUnit;
             }

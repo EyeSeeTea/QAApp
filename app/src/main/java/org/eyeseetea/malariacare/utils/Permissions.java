@@ -24,7 +24,7 @@ import android.app.Activity;
 import android.content.Context;
 import android.content.pm.PackageManager;
 import android.os.Build;
-import android.support.v4.app.ActivityCompat;
+import androidx.core.app.ActivityCompat;
 
 import java.util.HashMap;
 
@@ -74,8 +74,11 @@ public class Permissions {
                 android.Manifest.permission.ACCESS_FINE_LOCATION));
         addPermission(new Permission(READ_ACCOUNTS_STATE_REQUEST_CODE,
                 Manifest.permission.GET_ACCOUNTS));
-        addPermission(new Permission(PHONE_STATE_REQUEST_CODE,
-                android.Manifest.permission.READ_PHONE_STATE));
+
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.Q){
+            addPermission(new Permission(PHONE_STATE_REQUEST_CODE,
+                    android.Manifest.permission.READ_PHONE_STATE));
+        }
     }
 
     public void addPermission(Permission permission) {

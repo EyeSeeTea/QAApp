@@ -23,7 +23,7 @@ import android.util.Log;
 
 import org.eyeseetea.malariacare.DashboardActivity;
 import org.eyeseetea.malariacare.R;
-import org.eyeseetea.malariacare.data.database.iomodules.dhis.exporter.PushController;
+import org.eyeseetea.malariacare.data.database.iomodules.dhis.exporter.PushDataController;
 import org.eyeseetea.malariacare.data.database.utils.PreferencesState;
 import org.eyeseetea.malariacare.data.database.utils.Session;
 import org.eyeseetea.malariacare.domain.usecase.MockedPushSurveysUseCase;
@@ -71,7 +71,7 @@ public class PushServiceStrategy {
 
         pushUseCase.execute(Session.getCredentials(), new PushUseCase.Callback() {
             @Override
-            public void onComplete(PushController.Kind kind) {
+            public void onComplete(PushDataController.Kind kind) {
                 AlarmPushReceiver.isDoneSuccess(kind);
                 Log.d(TAG, "push complete");
             }
@@ -96,7 +96,7 @@ public class PushServiceStrategy {
 
             @Override
             public void onInformativeError(String message) {
-                Log.e(TAG, "An error has occurred to the conversion in push process"+message);
+                Log.e(TAG, "An error has occurred to the conversion in push process" + message);
                 showInDialog(PreferencesState.getInstance().getContext().getString(
                         R.string.error_message), message);
             }
@@ -118,11 +118,20 @@ public class PushServiceStrategy {
                 launchServerVersionErrorAction();
                 Log.e(TAG, "onServerVersionError");
             }
+
+            @Override
+            public void onRequiredAuthorityError(String authority) {
+                AlarmPushReceiver.isDoneFail();
+                showInDialog(PreferencesState.getInstance().getContext().getString(
+                        R.string.error_message),
+                        PreferencesState.getInstance().getContext().getString(
+                                R.string.required_authority_error));
+            }
         });
     }
 
     public boolean showInDialog(String title, String message) {
-        if(DashboardActivity.dashboardActivity.isVisible()) {
+        if (DashboardActivity.dashboardActivity != null && DashboardActivity.dashboardActivity.isVisible()) {
             DashboardActivity.dashboardActivity.showException(title, message);
             return true;
         }
@@ -130,8 +139,8 @@ public class PushServiceStrategy {
     }
 
     public void launchServerVersionErrorAction() {
-       AlarmPushReceiver.cancelPushAlarm(DashboardActivity.dashboardActivity);
-        if(DashboardActivity.dashboardActivity.isVisible()){
+        AlarmPushReceiver.cancelPushAlarm(DashboardActivity.dashboardActivity);
+        if (DashboardActivity.dashboardActivity.isVisible()) {
             DashboardActivity.dashboardActivity.showInvalidServerDialog();
         }
     }

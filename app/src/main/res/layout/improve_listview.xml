@@ -43,9 +43,9 @@
     <LinearLayout
         android:layout_width="0dp"
         android:layout_height="wrap_content"
-        android:layout_weight="0.9"
+        android:layout_weight="0.95"
         android:minHeight="@dimen/header_min_height"
-        android:padding="8dp"
+        android:padding="10dp"
         android:orientation="horizontal"
         android:paddingBottom="2dp"
         android:paddingTop="2dp"
@@ -57,7 +57,7 @@
             android:layout_height="wrap_content"
             android:layout_gravity="left|center"
             android:gravity="left|center"
-            android:layout_weight="0.4"
+            android:layout_weight="0.45"
             android:text="@string/assessment_title_facility_date"
             android:textColor="@color/planning_header_text"
             android:textSize="@dimen/header_light_text_size"
@@ -67,7 +67,7 @@
             android:id="@+id/statusHeader"
             android:layout_width="0dp"
             android:layout_height="wrap_content"
-            android:layout_weight="0.3"
+            android:layout_weight="0.27"
             android:paddingLeft="2dp"
             android:paddingRight="2dp"
             android:autoText="false"
@@ -83,28 +83,27 @@
             android:id="@+id/scoreHeader"
             android:layout_width="0dp"
             android:layout_height="wrap_content"
-            android:layout_weight="0.2"
+            android:layout_weight="0.29"
             android:autoText="false"
             android:layout_gravity="left|center"
             android:gravity="left|center"
-            android:text="@string/assessment_sent_score"
+            android:text="@string/assessment_sent_competency"
             android:textColor="@color/planning_header_text"
             android:textSize="@dimen/header_light_text_size"
             app:tDimension="@string/font_size_level2"
+            android:textAlignment="center"
             app:tFontName="@string/medium_font_name"  />
     </LinearLayout>
-        <View
-            android:layout_width="0dp"
-            android:layout_height="match_parent"
-            android:layout_weight="0.1"></View>
+
 </LinearLayout>
 
-    <ListView
-        android:id="@id/android:list"
+    <androidx.recyclerview.widget.RecyclerView
+        android:id="@+id/sentSurveyList"
         android:layout_width="match_parent"
         android:layout_height="match_parent"
+        app:layoutManager="androidx.recyclerview.widget.LinearLayoutManager"
         android:layout_below="@id/header"
-        android:background="@color/white" />
+        android:background="@color/white"/>
 
     <org.eyeseetea.malariacare.views.CustomTextView
         android:id="@+id/no_surveys_improve"
@@ -119,5 +118,6 @@
         android:textSize="@dimen/text_size_medium"
         app:tDimension="@string/font_size_level2"
         app:tFontName="@string/medium_font_name"
-        android:layout_margin="16dp"/>
+        android:layout_margin="16dp"
+        android:visibility="gone"/>
 </RelativeLayout>

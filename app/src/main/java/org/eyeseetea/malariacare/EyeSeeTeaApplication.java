@@ -24,28 +24,32 @@ import android.app.Application;
 import android.content.Context;
 import android.content.SharedPreferences;
 import android.preference.PreferenceManager;
-import android.support.multidex.MultiDex;
-import android.support.v7.app.AppCompatDelegate;
+import android.util.Log;
 
-import com.crashlytics.android.Crashlytics;
+import androidx.multidex.MultiDex;
+import androidx.appcompat.app.AppCompatDelegate;
+
+
 import com.github.stkent.bugshaker.BugShaker;
 import com.github.stkent.bugshaker.flow.dialog.AlertDialogType;
 import com.github.stkent.bugshaker.github.GitHubConfiguration;
+import com.google.firebase.FirebaseApp;
 import com.raizlabs.android.dbflow.config.EyeSeeTeaGeneratedDatabaseHolder;
 import com.raizlabs.android.dbflow.config.FlowConfig;
-import com.raizlabs.android.dbflow.config.FlowLog;
 import com.raizlabs.android.dbflow.config.FlowManager;
+import com.raizlabs.android.dbflow.structure.database.AndroidDatabase;
 
+import org.eyeseetea.malariacare.data.database.AppDatabase;
 import org.eyeseetea.malariacare.data.database.model.UserDB;
 import org.eyeseetea.malariacare.data.database.utils.LocationMemory;
 import org.eyeseetea.malariacare.data.database.utils.PreferencesState;
 import org.eyeseetea.malariacare.layout.dashboard.builder.AppSettingsBuilder;
 import org.eyeseetea.malariacare.layout.utils.AutoTabLayoutUtils;
+import org.eyeseetea.malariacare.presentation.bugs.BugReportKt;
 import org.eyeseetea.malariacare.utils.Permissions;
 import org.eyeseetea.malariacare.views.TypefaceCache;
 import org.hisp.dhis.client.sdk.android.api.D2;
 
-import io.fabric.sdk.android.Fabric;
 
 public class EyeSeeTeaApplication extends Application {
 
@@ -59,13 +63,9 @@ public class EyeSeeTeaApplication extends Application {
     public void onCreate() {
         super.onCreate();
 
-        //Apply for Release build
-        if (!BuildConfig.DEBUG) {
-            Fabric.with(this, new Crashlytics());
-        } else {
-            // Set to verbose logging of select and delete instructions in DBFlow
-            FlowLog.setMinimumLoggingLevel(FlowLog.Level.V);
-        }
+        FirebaseApp.initializeApp(this);
+
+        BugReportKt.addGitHash(this);
 
         AppSettingsBuilder.getInstance().init(getApplicationContext());
         PreferencesState.getInstance().init(getApplicationContext());
@@ -80,9 +80,18 @@ public class EyeSeeTeaApplication extends Application {
                 .build();
         FlowManager.init(flowConfig);
 
+
+        //This solves bug import db from Android 9 (API 28). Demo mode is failing for this bug.
+        //https://stackoverflow.com/questions/52232143/database-importing-problem-in-android-pie
+        //https://stackoverflow.com/questions/54051322/database-import-and-export-not-working-in-android-pie
+        //https://stackoverflow.com/questions/53659206/disabling-sqlite-write-ahead-logging-in-android-pie
+        //This requires change min SDK version from 15 to 16
+        ((AndroidDatabase)FlowManager.getWritableDatabase(AppDatabase.NAME))
+                .getDatabase().disableWriteAheadLogging();
+
         // Create indexes to accelerate the DB selects and avoid SQlite errors
         createDBIndexes();
-        //initBugShaker();
+        initBugShaker();
     }
 
     @Override

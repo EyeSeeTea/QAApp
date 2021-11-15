@@ -19,26 +19,28 @@
 
 package org.eyeseetea.malariacare.fragments;
 
-import android.app.Activity;
-import android.app.AlertDialog;
+import static org.eyeseetea.malariacare.data.database.utils.monitor.JavascriptInvokerKt.invokeSetServerClassification;
+import static org.eyeseetea.malariacare.data.database.utils.monitor.JavascriptInvokerKt.invokeUpdateOrgUnitFilter;
+import static org.eyeseetea.malariacare.data.database.utils.monitor.JavascriptInvokerKt.invokeUpdateProgramFilter;
+
 import android.content.BroadcastReceiver;
 import android.content.Context;
 import android.content.Intent;
 import android.content.IntentFilter;
-import android.content.res.Resources;
 import android.os.Build;
 import android.os.Bundle;
-import android.support.v4.app.Fragment;
-import android.support.v4.content.LocalBroadcastManager;
+
+import androidx.fragment.app.FragmentManager;
+import androidx.localbroadcastmanager.content.LocalBroadcastManager;
 import android.util.Log;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
+import android.webkit.WebResourceError;
+import android.webkit.WebResourceRequest;
 import android.webkit.WebView;
 import android.webkit.WebViewClient;
-import android.widget.Button;
-import android.widget.LinearLayout;
-import android.widget.TextView;
+import android.widget.Toast;
 
 import org.eyeseetea.malariacare.DashboardActivity;
 import org.eyeseetea.malariacare.R;
@@ -47,32 +49,25 @@ import org.eyeseetea.malariacare.data.database.model.ProgramDB;
 import org.eyeseetea.malariacare.data.database.model.SurveyDB;
 import org.eyeseetea.malariacare.data.database.utils.PreferencesState;
 import org.eyeseetea.malariacare.data.database.utils.Session;
-import org.eyeseetea.malariacare.data.database.utils.monitor.MonitorMessagesBuilder;
-import org.eyeseetea.malariacare.data.database.utils.monitor.allassessments.SentSurveysBuilderBase;
-import org.eyeseetea.malariacare.data.database.utils.monitor.allassessments
-        .SentSurveysBuilderByOrgUnit;
-import org.eyeseetea.malariacare.data.database.utils.monitor.allassessments
-        .SentSurveysBuilderByProgram;
-import org.eyeseetea.malariacare.data.database.utils.monitor.facilities.FacilityTableBuilderBase;
+import org.eyeseetea.malariacare.data.database.utils.monitor.InitMessagesInvoker;
+import org.eyeseetea.malariacare.data.database.utils.monitor.facilities.SetClassificationContextInvoker;
 import org.eyeseetea.malariacare.data.database.utils.monitor.facilities.FacilityTableBuilderByOrgUnit;
 import org.eyeseetea.malariacare.data.database.utils.monitor.facilities.FacilityTableBuilderByProgram;
 import org.eyeseetea.malariacare.data.database.utils.monitor.pies.PieBuilderByOrgUnit;
 import org.eyeseetea.malariacare.data.database.utils.monitor.pies.PieBuilderByProgram;
 import org.eyeseetea.malariacare.data.database.utils.services.BaseServiceBundle;
-import org.eyeseetea.malariacare.domain.entity.ScoreType;
+import org.eyeseetea.malariacare.domain.entity.ServerClassification;
 import org.eyeseetea.malariacare.layout.dashboard.config.MonitorFilter;
 import org.eyeseetea.malariacare.presentation.executors.UIThreadExecutor;
 import org.eyeseetea.malariacare.services.SurveyService;
-import org.eyeseetea.malariacare.utils.AUtils;
-import org.eyeseetea.malariacare.utils.DateParser;
+import org.eyeseetea.malariacare.views.MonitorSurveysDialogFragment;
 import org.eyeseetea.malariacare.views.filters.OrgUnitProgramFilterView;
 
 import java.util.ArrayList;
 import java.util.Iterator;
 import java.util.List;
-import java.util.Locale;
 
-public class MonitorFragment extends Fragment implements IModuleFragment {
+public class MonitorFragment extends FiltersFragment  implements IModuleFragment {
     List<SurveyDB> surveysForGraphic;
     public static final String TAG = ".MonitorFragment";
     private SurveyReceiver surveyReceiver;
@@ -83,7 +78,20 @@ public class MonitorFragment extends Fragment implements IModuleFragment {
     public MonitorFilter filterType;
     private WebViewInterceptor mWebViewInterceptor;
 
-    private OrgUnitProgramFilterView orgUnitProgramFilterView;
+    private View rootView;
+
+    private static String SERVER_CLASSIFICATION = "ServerClassification";
+    private ServerClassification serverClassification;
+
+    public static MonitorFragment newInstance(ServerClassification serverClassification) {
+        MonitorFragment fragment = new MonitorFragment();
+
+        Bundle args = new Bundle();
+        args.putInt(SERVER_CLASSIFICATION, serverClassification.getCode());
+        fragment.setArguments(args);
+
+        return fragment;
+    }
 
     public MonitorFragment() {
         this.surveys = new ArrayList();
@@ -93,64 +101,46 @@ public class MonitorFragment extends Fragment implements IModuleFragment {
 
     @Override
     public void onCreate(Bundle savedInstanceState) {
-        Log.d(TAG, "onCreate");
         super.onCreate(savedInstanceState);
+    }
+
+    @Override
+    protected void onFiltersChanged() {
+        if (getSelectedProgramUidFilter().isEmpty() && getSelectedOrgUnitUidFilter().isEmpty()) {
+            DashboardActivity.dashboardActivity.openMonitorByActions();
+        } else {
+            if (webView == null) return;
+
+            if (!getSelectedProgramUidFilter().isEmpty()) {
+                invokeUpdateProgramFilter(webView,getSelectedProgramUidFilter());
+            } else {
+                invokeUpdateOrgUnitFilter(webView,getSelectedOrgUnitUidFilter());
+            }
+        }
+    }
+
+    @Override
+    protected OrgUnitProgramFilterView.FilterType getFilterType() {
+        return OrgUnitProgramFilterView.FilterType.EXCLUSIVE;
+    }
+
+    @Override
+    protected int getOrgUnitProgramFilterViewId() {
+        return R.id.monitor_org_unit_program_filter_view;
     }
 
     @Override
     public View onCreateView(LayoutInflater inflater, ViewGroup container,
             Bundle savedInstanceState) {
-        Log.d(TAG, "onCreateView");
-        if (container == null) {
-            return null;
-        }
 
-        loadFilter();
+        serverClassification = ServerClassification.Companion.get(
+                getArguments().getInt(SERVER_CLASSIFICATION));
 
-        orgUnitProgramFilterView.setFilterType(OrgUnitProgramFilterView.FilterType.EXCLUSIVE);
+        rootView = inflater.inflate(R.layout.fragment_monitor_by_calendar, container, false);
 
-        orgUnitProgramFilterView.setFilterChangedListener(
-                new OrgUnitProgramFilterView.FilterChangedListener() {
-                    @Override
-                    public void onProgramFilterChanged(ProgramDB selectedProgramFilter) {
-                        pushProgramFilterToJavascript(selectedProgramFilter.getUid());
-                        saveCurrentFilters();
-                    }
+        webView =  rootView.findViewById(R.id.dashboard_monitor);
 
-                    @Override
-                    public void onOrgUnitFilterChanged(OrgUnitDB selectedOrgUnitFilter) {
-                        pushOrgUnitFilterToJavascript(selectedOrgUnitFilter.getUid());
-                        saveCurrentFilters();
-                    }
-                });
-
-
-        return super.onCreateView(inflater, container, savedInstanceState);
-    }
-
-    private void pushOrgUnitFilterToJavascript(String selectedOrgUnitFilter) {
-        String JAVASCRIPT_UPDATE_FILTER = "javascript:updateOrgUnitFilter('%s')";
-        String updateChartJS=String.format(JAVASCRIPT_UPDATE_FILTER, selectedOrgUnitFilter);
-        Log.d(TAG, updateChartJS);
-        if(webView!=null) {
-            webView.loadUrl(updateChartJS);
-        }
-    }
-
-    private void pushProgramFilterToJavascript(String selectedProgramFilter) {
-        String JAVASCRIPT_UPDATE_FILTER = "javascript:updateProgramFilter('%s')";
-        String updateChartJS=String.format(JAVASCRIPT_UPDATE_FILTER, selectedProgramFilter);
-        Log.d(TAG, updateChartJS);
-        if(webView!=null) {
-            webView.loadUrl(updateChartJS);
-        }
-    }
-
-    private void saveCurrentFilters() {
-        PreferencesState.getInstance().setProgramUidFilter(
-                orgUnitProgramFilterView.getSelectedProgramFilter().getUid());
-        PreferencesState.getInstance().setOrgUnitUidFilter(
-                orgUnitProgramFilterView.getSelectedOrgUnitFilter().getUid());
+        return rootView;
     }
 
     @Override
@@ -171,7 +161,6 @@ public class MonitorFragment extends Fragment implements IModuleFragment {
 
     @Override
     public void onStop() {
-        Log.d(TAG, "onStop");
         unregisterSurveysReceiver();
         stopMonitor();
         super.onStop();
@@ -179,25 +168,9 @@ public class MonitorFragment extends Fragment implements IModuleFragment {
 
     @Override
     public void onPause() {
-        Log.d(TAG, "onPause");
         unregisterSurveysReceiver();
 
         super.onPause();
-    }
-
-    private void updateSelectedFilters() {
-        if (orgUnitProgramFilterView == null) {
-            loadFilter();
-        }
-        String programUidFilter = PreferencesState.getInstance().getProgramUidFilter();
-        String orgUnitUidFilter = PreferencesState.getInstance().getOrgUnitUidFilter();
-        orgUnitProgramFilterView.changeSelectedFilters(programUidFilter, orgUnitUidFilter);
-    }
-
-    private void loadFilter() {
-        orgUnitProgramFilterView =
-                (OrgUnitProgramFilterView) DashboardActivity.dashboardActivity
-                        .findViewById(R.id.monitor_org_unit_program_filter_view);
     }
 
     public void setFilterType(MonitorFilter monitorFilter) {
@@ -285,60 +258,57 @@ public class MonitorFragment extends Fragment implements IModuleFragment {
                 if (!isAdded()) {
                     return;
                 }
-                //Update hardcoded messages
-                new MonitorMessagesBuilder().addDataInChart(view);
+
+                invokeSetServerClassification(webView, serverClassification);
 
                 //Update hardcoded messages
-                new MonitorMessagesBuilder().addDataInChart(view);
+                new InitMessagesInvoker().invoke(view);
 
-                //Set the colors of red/green/yellow pie and table
-                FacilityTableBuilderBase.setColor(view);
-
-                //Add line chart
-                if (isOrgUnitFilterActive()) {
-                    new SentSurveysBuilderByOrgUnit(surveysForGraphic, getActivity(),
-                            orgUnits).addDataInChart(view);
+                if (serverClassification == ServerClassification.COMPETENCIES) {
+                    SetClassificationContextInvoker.invokeByCompetencies(view);
+                } else {
+                    SetClassificationContextInvoker.invokeByScoring(view);
                 }
 
-                if (isProgramFilterActive()) {
-                    new SentSurveysBuilderByProgram(surveysForGraphic, getActivity(),
-                            programs).addDataInChart(view);
-                }
-                //Set chart title
-                SentSurveysBuilderBase.injectChartTitle(webView);
-
-                //Show stats by program
-                SentSurveysBuilderBase.showData(view);
-
-                //Add line chart
                 if (isOrgUnitFilterActive()) {
-                    new PieBuilderByOrgUnit(surveysForGraphic).addDataInChart(view);
+                    new PieBuilderByOrgUnit(surveysForGraphic, serverClassification)
+                            .addDataInChart(view);
                 }
                 if (isProgramFilterActive()) {
-                    new PieBuilderByProgram(surveysForGraphic).addDataInChart(view);
+                    new PieBuilderByProgram(surveysForGraphic, serverClassification)
+                            .addDataInChart(view);
                 }
 
-                //Add line chart
                 if (isOrgUnitFilterActive()) {
-                    //facility by progam-> is a orgunit facility
-                    new FacilityTableBuilderByProgram(surveysForGraphic).addDataInChart(view);
+                    new FacilityTableBuilderByProgram(surveysForGraphic).addDataInChart(
+                            view,
+                            serverClassification);
                 }
                 if (isProgramFilterActive()) {
-                    //facility by orgunit-> is a program facility
-                    new FacilityTableBuilderByOrgUnit(surveysForGraphic).addDataInChart(view);
+                    new FacilityTableBuilderByOrgUnit(surveysForGraphic).addDataInChart(
+                            view,
+                            serverClassification);
                 }
 
-                //Draw facility main table
+                String programUidFilter =
+                        PreferencesState.getInstance().getProgramUidFilter();
+                String orgUnitUidFilter =
+                        PreferencesState.getInstance().getOrgUnitUidFilter();
 
-                String programUidFilter = PreferencesState.getInstance().getProgramUidFilter();
-                String orgUnitUidFilter = PreferencesState.getInstance().getOrgUnitUidFilter();
-                if(!programUidFilter.equals("")){
-                    pushProgramFilterToJavascript(programUidFilter);
-                }else if(!orgUnitUidFilter.equals("")){
-                    pushOrgUnitFilterToJavascript(orgUnitUidFilter);
-                }else{
-                    FacilityTableBuilderByProgram.showFacilities(view);
+                if (!programUidFilter.equals("")) {
+                    invokeUpdateProgramFilter(webView, programUidFilter);
+                } else if (!orgUnitUidFilter.equals("")) {
+                    invokeUpdateOrgUnitFilter(webView, orgUnitUidFilter);
                 }
+            }
+
+            @Override
+            public void onReceivedError(WebView view, WebResourceRequest request,
+                    WebResourceError error) {
+                //Your code to do
+                Toast.makeText(getActivity(),
+                        "Your Internet Connection May not be active Or " + error,
+                        Toast.LENGTH_LONG).show();
             }
         });
         //Load html
@@ -354,8 +324,6 @@ public class MonitorFragment extends Fragment implements IModuleFragment {
     }
 
     private WebView initMonitor() {
-        Activity activity = getActivity();
-        WebView webView = (WebView) activity.findViewById(R.id.dashboard_monitor);
         //Init webView settings
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.JELLY_BEAN) {
             webView.getSettings().setAllowUniversalAccessFromFileURLs(true);
@@ -369,15 +337,7 @@ public class MonitorFragment extends Fragment implements IModuleFragment {
         mWebViewInterceptor.setBubbleClickListener(new WebViewInterceptor.BubbleClickListener() {
             @Override
             public void onClickMultipleSurveys(String uidList) {
-                ArrayList<SurveyDB> surveys = new ArrayList<>();
-                if (uidList.length() > 0) {
-                    String uids[] = uidList.split(";");
-                    for (String uid : uids) {
-                        surveys.add(SurveyDB.findById(Long.parseLong(uid)));
-                    }
-                }
-
-                showListOfSurveys(surveys);
+                showListOfSurveys(uidList);
             }
 
             @Override
@@ -385,7 +345,8 @@ public class MonitorFragment extends Fragment implements IModuleFragment {
                 new UIThreadExecutor().run(new Runnable() {
                     @Override
                     public void run() {
-                        DashboardActivity.dashboardActivity.openFeedback(SurveyDB.findById(Long.parseLong(uid)), false);
+                        DashboardActivity.dashboardActivity.openFeedback(
+                                SurveyDB.findById(Long.parseLong(uid)), false);
                     }
                 });
             }
@@ -395,64 +356,14 @@ public class MonitorFragment extends Fragment implements IModuleFragment {
         return webView;
     }
 
-    public void showListOfSurveys(final ArrayList<SurveyDB> surveys) {
-        AlertDialog.Builder builder = new AlertDialog.Builder(DashboardActivity.dashboardActivity);
-        LayoutInflater inflater = DashboardActivity.dashboardActivity.getLayoutInflater();
+    public void showListOfSurveys(String surveyIds) {
 
-        View v = inflater.inflate(R.layout.historical_log_dialog, null);
-        builder.setView(v);
-        TextView orgUnit = (TextView) v.findViewById(R.id.org_unitName);
-        TextView program = (TextView) v.findViewById(R.id.programName);
-        program.setText(surveys.get(0).getProgram().getName());
-        orgUnit.setText(surveys.get(0).getOrgUnit().getName());
-        Button cancel = (Button) v.findViewById(R.id.cancel);
-        LinearLayout linearLayout = (LinearLayout) v.findViewById(R.id.log_content);
-        View row = inflater.inflate(R.layout.item_list_dialog_header, null);
-        ((TextView)row.findViewById(R.id.first_column)).setText(R.string.assessment_sent_date);
-        ((TextView)row.findViewById(R.id.second_column)).setText(R.string.score);
-        linearLayout.addView(row);
-        final AlertDialog alertDialog = builder.create();
-        for(final SurveyDB survey: surveys){
-            row = inflater.inflate(R.layout.item_list_row_row, null);
-            TextView completionDate = (TextView) row.findViewById(R.id.first_column);
-            TextView score = (TextView) row.findViewById(R.id.second_column);
-            DateParser dateParser = new DateParser();
-            completionDate.setText(dateParser.getEuropeanFormattedDate(survey.getCompletionDate()));
-            score.setText(Math.round(survey.getMainScore())+"");
-            Resources resources = PreferencesState.getInstance().getContext().getResources();
+        FragmentManager fm = getActivity().getSupportFragmentManager();
 
-            ScoreType scoreType = new ScoreType(survey.getMainScore());
-            if (scoreType.isTypeA()) {
-                score.setBackgroundColor(resources.getColor(R.color.high_score_color));
-            }else if (scoreType.isTypeB()){
-                score.setBackgroundColor(resources.getColor(R.color.medium_score_color));
-            }else if (scoreType.isTypeC()){
-                score.setBackgroundColor(resources.getColor(R.color.low_score_color));
-            }
-            row.setOnClickListener(new View.OnClickListener() {
-                @Override
-                public void onClick(View view) {
-                    alertDialog.dismiss();
-                    new UIThreadExecutor().run(new Runnable() {
-                        @Override
-                        public void run() {
-                            DashboardActivity.dashboardActivity.openFeedback(survey, false);
-                        }
-                    });
-                }
-            });
-            linearLayout.addView(row );
-        }
-        cancel.setOnClickListener(
-                new View.OnClickListener() {
-                    @Override
-                    public void onClick(View v) {
-                        alertDialog.dismiss();
-                    }
-                }
-        );
+        MonitorSurveysDialogFragment monitorSurveysDialogFragment =
+                MonitorSurveysDialogFragment.newInstance(surveyIds, serverClassification);
 
-        alertDialog.show();
+        monitorSurveysDialogFragment.show(fm, "");
     }
 
     /**
@@ -473,7 +384,7 @@ public class MonitorFragment extends Fragment implements IModuleFragment {
      */
     @Override
     public void reloadData() {
-        updateSelectedFilters();
+        super.reloadData();
 
         //Reload data using service
         Intent surveysIntent = new Intent(

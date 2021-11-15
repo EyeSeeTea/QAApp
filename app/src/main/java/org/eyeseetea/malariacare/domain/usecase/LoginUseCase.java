@@ -19,22 +19,32 @@
 
 package org.eyeseetea.malariacare.domain.usecase;
 
+import static org.eyeseetea.malariacare.domain.entity.UserKt.REQUIRED_AUTHORITY;
+
 import org.eyeseetea.malariacare.domain.boundary.IRepositoryCallback;
 import org.eyeseetea.malariacare.domain.boundary.executors.IAsyncExecutor;
 import org.eyeseetea.malariacare.domain.boundary.executors.IMainExecutor;
 import org.eyeseetea.malariacare.domain.boundary.repositories.IServerInfoRepository;
+import org.eyeseetea.malariacare.domain.boundary.repositories.IServerRepository;
 import org.eyeseetea.malariacare.domain.boundary.repositories.IUserAccountRepository;
+import org.eyeseetea.malariacare.domain.boundary.repositories.UserFailure;
+import org.eyeseetea.malariacare.domain.boundary.repositories.UserRepository;
+import org.eyeseetea.malariacare.domain.common.Either;
 import org.eyeseetea.malariacare.domain.entity.Credentials;
+import org.eyeseetea.malariacare.domain.entity.Server;
+import org.eyeseetea.malariacare.domain.entity.User;
 import org.eyeseetea.malariacare.domain.entity.UserAccount;
 import org.eyeseetea.malariacare.domain.common.ReadPolicy;
 import org.eyeseetea.malariacare.domain.exception.InvalidCredentialsException;
 import org.eyeseetea.malariacare.domain.exception.NetworkException;
+import org.eyeseetea.malariacare.layout.utils.LayoutUtils;
 import org.hisp.dhis.client.sdk.models.common.UnsupportedServerVersionException;
 
 import java.net.MalformedURLException;
 import java.net.UnknownHostException;
+import java.util.List;
 
-public class LoginUseCase implements UseCase{
+public class LoginUseCase implements UseCase {
 
     public interface Callback {
         void onLoginSuccess();
@@ -45,24 +55,32 @@ public class LoginUseCase implements UseCase{
 
         void onNetworkError();
 
+        void onRequiredAuthorityError(String authority);
+
         void onUnsupportedServerVersion();
     }
 
     private IMainExecutor mMainExecutor;
     private IAsyncExecutor mAsyncExecutor;
     private IUserAccountRepository mUserAccountRepository;
-    private IServerInfoRepository mServerRepository;
+    private IServerRepository mServerRepository;
+    private IServerInfoRepository mServerInfoRepository;
+    private UserRepository userRepository;
     private Credentials credentials;
     private Callback callback;
 
     public LoginUseCase(IUserAccountRepository userAccountRepository,
-                        IServerInfoRepository serverRepository,
-                        IMainExecutor mainExecutor,
-                        IAsyncExecutor asyncExecutor) {
+            IServerRepository serverRepository,
+            IServerInfoRepository serverInfoRepository,
+            UserRepository userRepository,
+            IMainExecutor mainExecutor,
+            IAsyncExecutor asyncExecutor) {
         mMainExecutor = mainExecutor;
         mAsyncExecutor = asyncExecutor;
-        mUserAccountRepository = userAccountRepository;
         mServerRepository = serverRepository;
+        mUserAccountRepository = userAccountRepository;
+        mServerInfoRepository = serverInfoRepository;
+        this.userRepository = userRepository;
     }
 
     public void execute(Credentials credentials, final Callback callback) {
@@ -73,20 +91,16 @@ public class LoginUseCase implements UseCase{
 
     @Override
     public void run() {
-        if(!credentials.isDemoCredentials()) {
-            try {
-                mServerRepository.getServerInfo(ReadPolicy.NETWORK_FIRST);
-            } catch (Exception e) {
-                e.printStackTrace();
-                notifyOnNetworkError();
-                return;
-            }
-        }
-
         mUserAccountRepository.login(credentials, new IRepositoryCallback<UserAccount>() {
             @Override
             public void onSuccess(UserAccount userAccount) {
-                notifyOnLoginSuccess();
+                Boolean containsRequiredAuthority = verifyRequiredAuthority();
+
+                if (containsRequiredAuthority) {
+                    updateLoggedServer();
+                    getServerVersion();
+                    notifyOnLoginSuccess();
+                }
             }
 
             @Override
@@ -98,11 +112,70 @@ public class LoginUseCase implements UseCase{
                     notifyOnInvalidCredentials();
                 } else if (throwable instanceof NetworkException) {
                     notifyOnNetworkError();
-                } else if (throwable instanceof UnsupportedServerVersionException){
+                } else if (throwable instanceof UnsupportedServerVersionException) {
                     notifyOnServerVersionError();
                 }
             }
         });
+    }
+
+    private void getServerVersion() {
+        if (!credentials.isDemoCredentials()) {
+            try {
+                mServerInfoRepository.getServerInfo(ReadPolicy.NETWORK_FIRST);
+            } catch (Exception e) {
+                e.printStackTrace();
+                notifyOnNetworkError();
+                return;
+            }
+        }
+    }
+
+    private Boolean verifyRequiredAuthority() {
+        if (!credentials.isDemoCredentials()) {
+            Either<UserFailure, User> userResponse = userRepository.getCurrent();
+
+            if (userResponse.isLeft()) {
+                notifyOnNetworkError();
+                return false;
+            } else {
+                User user = ((Either.Right<User>) userResponse).getValue();
+
+                if (user.getAuthorities().contains(REQUIRED_AUTHORITY)) {
+                    return true;
+                } else {
+                    notifyRequiredAuthorityError(REQUIRED_AUTHORITY);
+                    return false;
+                }
+            }
+        } else {
+            return true;
+        }
+    }
+
+    private void updateLoggedServer() {
+        if (!credentials.isDemoCredentials()) {
+            try {
+                List<Server> servers = mServerRepository.getAll(ReadPolicy.CACHE);
+
+                Server connectedServer = null;
+
+                for (Server server : servers) {
+                    if (server.getUrl().equals(this.credentials.getServerURL())) {
+                        connectedServer = server;
+                    }
+                }
+
+                if (connectedServer == null) {
+                    connectedServer = new Server(this.credentials.getServerURL());
+                }
+
+                mServerRepository.save(connectedServer.changeToConnected());
+                mServerRepository.getLoggedServer();
+            } catch (Exception e) {
+                e.printStackTrace();
+            }
+        }
     }
 
     private void notifyOnLoginSuccess() {
@@ -122,6 +195,7 @@ public class LoginUseCase implements UseCase{
             }
         });
     }
+
     private void notifyOnInvalidCredentials() {
         mMainExecutor.run(new Runnable() {
             @Override
@@ -130,6 +204,7 @@ public class LoginUseCase implements UseCase{
             }
         });
     }
+
     private void notifyOnNetworkError() {
         mMainExecutor.run(new Runnable() {
             @Override
@@ -138,6 +213,16 @@ public class LoginUseCase implements UseCase{
             }
         });
     }
+
+    private void notifyRequiredAuthorityError(String RequiredAuthority) {
+        mMainExecutor.run(new Runnable() {
+            @Override
+            public void run() {
+                callback.onRequiredAuthorityError(RequiredAuthority);
+            }
+        });
+    }
+
     private void notifyOnServerVersionError() {
         mMainExecutor.run(new Runnable() {
             @Override
@@ -147,4 +232,3 @@ public class LoginUseCase implements UseCase{
         });
     }
 }
-

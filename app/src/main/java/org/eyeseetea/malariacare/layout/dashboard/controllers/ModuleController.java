@@ -25,23 +25,19 @@ import android.app.AlertDialog;
 import android.content.DialogInterface;
 import android.content.Intent;
 import android.graphics.drawable.Drawable;
-import android.support.v4.app.Fragment;
-import android.support.v4.app.FragmentTransaction;
-import android.support.v4.app.ListFragment;
+import androidx.fragment.app.Fragment;
+import androidx.fragment.app.FragmentTransaction;
+import androidx.fragment.app.ListFragment;
 import android.view.View;
 
 import org.eyeseetea.malariacare.DashboardActivity;
 import org.eyeseetea.malariacare.R;
-import org.eyeseetea.malariacare.data.database.model.ProgramDB;
-import org.eyeseetea.malariacare.data.database.model.SurveyDB;
 import org.eyeseetea.malariacare.data.database.utils.Session;
+import org.eyeseetea.malariacare.domain.entity.Server;
 import org.eyeseetea.malariacare.fragments.IModuleFragment;
 import org.eyeseetea.malariacare.layout.dashboard.config.ModuleSettings;
 import org.eyeseetea.malariacare.layout.utils.LayoutUtils;
 
-/**
- * Created by idelcano on 25/02/2016.
- */
 public abstract class ModuleController {
 
     /**
@@ -66,6 +62,8 @@ public abstract class ModuleController {
     Fragment fragment;
     boolean visible;
 
+    protected Server server;
+
     protected ModuleController() {
     }
 
@@ -88,22 +86,6 @@ public abstract class ModuleController {
 
     public String getTitle() {
         return dashboardActivity.getResources().getString(moduleSettings.getResTitle());
-    }
-
-    public String getActionBarTitleBySurvey(SurveyDB survey) {
-        String title = "";
-        if (survey.getOrgUnit().getName() != null) {
-            title = survey.getOrgUnit().getName();
-        }
-        return title;
-    }
-
-    public String getActionBarSubTitleBySurvey(SurveyDB survey) {
-        ProgramDB program = survey.getProgram();
-        if (program.getName() != null) {
-            return program.getName();
-        }
-        return "";
     }
 
     public Drawable getIcon() {
@@ -169,7 +151,8 @@ public abstract class ModuleController {
      * Inits the module (inside a responsability chain (dashboardActivity.onCreate ->
      * dashboardController.onCreate -> here))
      */
-    public void onCreate(DashboardActivity dashboardActivity) {
+    public void onCreate(DashboardActivity dashboardActivity, Server server) {
+        this.server = server;
         if (!isVisible()) {
             return;
         }
@@ -215,11 +198,17 @@ public abstract class ModuleController {
     }
 
     public void setActionBarDashboard() {
-        LayoutUtils.setActionBarDashboard(dashboardActivity, getTitle());
+        if (server.isDataCompleted()) {
+            LayoutUtils.setActionBarDashboard(dashboardActivity, server.getName(),
+                    getTitle());
+        } else {
+            LayoutUtils.setActionBarDashboard(dashboardActivity, getTitle());
+        }
     }
 
     public void setActionBarDashboardWithProgram() {
-        LayoutUtils.setActionBarDashboard(dashboardActivity, getTitle()+" - "+Session.getSurveyByModule(getName()).getProgram().getName());
+        LayoutUtils.setActionBarDashboard(dashboardActivity,
+                getTitle() + " - " + Session.getSurveyByModule(getName()).getProgram().getName());
     }
 
     public void replaceFragment(int layout, Fragment fragment) {
@@ -234,7 +223,7 @@ public abstract class ModuleController {
 
         FragmentTransaction ft = getFragmentTransaction();
         ft.replace(layout, fragment);
-        ft.commit();
+        ft.commitAllowingStateLoss();
     }
 
     public FragmentTransaction getFragmentTransaction() {

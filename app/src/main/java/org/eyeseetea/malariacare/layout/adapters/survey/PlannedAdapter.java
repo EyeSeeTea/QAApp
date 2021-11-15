@@ -21,97 +21,135 @@ package org.eyeseetea.malariacare.layout.adapters.survey;
 
 import android.content.Context;
 import android.graphics.Typeface;
+import androidx.annotation.NonNull;
+import androidx.recyclerview.widget.RecyclerView;
 import android.util.Log;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
-import android.widget.BaseAdapter;
-import android.widget.ImageButton;
 import android.widget.ImageView;
-import android.widget.LinearLayout;
 import android.widget.TextView;
 
 import org.eyeseetea.malariacare.DashboardActivity;
 import org.eyeseetea.malariacare.R;
-import org.eyeseetea.malariacare.data.database.model.ProgramDB;
 import org.eyeseetea.malariacare.data.database.model.SurveyDB;
 import org.eyeseetea.malariacare.data.database.utils.PreferencesState;
 import org.eyeseetea.malariacare.data.database.utils.planning.PlannedHeader;
 import org.eyeseetea.malariacare.data.database.utils.planning.PlannedItem;
 import org.eyeseetea.malariacare.data.database.utils.planning.PlannedSurvey;
 import org.eyeseetea.malariacare.data.database.utils.planning.ScheduleListener;
-import org.eyeseetea.malariacare.utils.AUtils;
+import org.eyeseetea.malariacare.domain.entity.CompetencyScoreClassification;
+import org.eyeseetea.malariacare.domain.entity.ServerClassification;
+import org.eyeseetea.malariacare.utils.CompetencyUtils;
 import org.eyeseetea.malariacare.utils.DateParser;
 
+import java.util.ArrayList;
 import java.util.List;
-import java.util.Locale;
 
-/**
- * Created by arrizabalaga on 14/09/15.
- */
-public class PlannedAdapter extends BaseAdapter {
+public class PlannedAdapter extends RecyclerView.Adapter<RecyclerView.ViewHolder> {
+
+    private static final int PLAN_ITEM_TYPE = 1;
+    private static final int PLAN_HEADER_TYPE = 2;
 
     private final String TAG = ".PlannedAdapter";
 
-    private List<PlannedItem> items;
+    private List<PlannedItem> items = new ArrayList<>();
 
     private Context context;
 
     /**
      * Items filtered by this program
      */
-    ProgramDB programFilter;
+    String programUidFilter;
 
     /**
      * Current selected header (working like an accordeon)
      */
     PlannedHeader currentHeader;
 
-    /**
-     * Number of items shown according to the selected section and filter
-     */
+    private ServerClassification classification;
+
     int numShown;
 
-    /**
-     * Item order in the block tab(init in the header tab).
-     */
-    int itemOrder;
-
-    public PlannedAdapter(List<PlannedItem> items, Context context) {
-        this.items = items;
+    public PlannedAdapter(Context context,
+            ServerClassification classification) {
         this.context = context;
-    }
-
-    private void toggleSection(PlannedHeader header) {
-
-        //An empty section cannot be open
-        if (header == null || header.getCounter() == 0) {
-            return;
-        }
-
-        //Annotate currentHeader
-        Log.d(TAG, "toggleSection: " + header);
-        currentHeader = (currentHeader == header) ? null : header;
-        applyFilter(programFilter);
+        this.classification = classification;
     }
 
     @Override
-    public int getCount() {
+    public int getItemViewType(int position) {
+        PlannedItem plannedItem = getItem(position);
+        if (plannedItem instanceof PlannedHeader) {
+            return PLAN_HEADER_TYPE;
+        } else {
+            return PLAN_ITEM_TYPE;
+        }
+    }
+
+    @NonNull
+    @Override
+    public RecyclerView.ViewHolder onCreateViewHolder(@NonNull ViewGroup parent, int viewType) {
+        View itemView;
+        switch (viewType) {
+            case PLAN_HEADER_TYPE:
+                itemView = LayoutInflater.from(parent.getContext())
+                        .inflate(R.layout.planning_header_row, parent, false);
+                return new PlanHeaderViewHolder(itemView);
+            default: // PLAN_ITEM_TYPE
+                itemView = LayoutInflater.from(parent.getContext())
+                        .inflate(R.layout.planning_survey_row, parent, false);
+                return new PlanItemViewHolder(itemView, classification);
+        }
+    }
+
+    @Override
+    public void onBindViewHolder(@NonNull RecyclerView.ViewHolder viewHolder, int position) {
+        PlannedItem plannedItem = getItem(position);
+
+        switch (getItemViewType(position)) {
+            case PLAN_HEADER_TYPE:
+                ((PlanHeaderViewHolder) viewHolder).bindView(position);
+                break;
+            case PLAN_ITEM_TYPE:
+                ((PlanItemViewHolder) viewHolder).bindView(position);
+                break;
+        }
+    }
+
+    @Override
+    public int getItemCount() {
         return numShown;
     }
 
-    public void reloadItems(List<PlannedItem> newItems) {
+    private PlannedItem getItem(int position) {
+        int numShownItems = 0;
+        for (int i = 0; i < items.size(); i++) {
+            PlannedItem plannedItem = items.get(i);
+
+            if ((plannedItem.isShownByProgram(programUidFilter) || programUidFilter.equals(""))
+                    && plannedItem.isShownByHeader(currentHeader)) {
+                numShownItems++;
+                if (position == (numShownItems - 1)) {
+                    return plannedItem;
+                }
+            }
+        }
+        return null;
+    }
+
+    public void setItems(List<PlannedItem> newItems) {
         Log.d(TAG, "reloadItems: " + newItems.size());
         this.items.clear();
         this.items.addAll(newItems);
         applyFilter(null);
     }
 
-    public void applyFilter(ProgramDB program) {
-        Log.d(TAG, "applyFilter:" + program);
+    public void applyFilter(String programUid) {
+        Log.d(TAG, "applyFilter:" + programUid);
 
         //Annotate filter
-        programFilter = program;
+        programUidFilter = programUid;
 
         //Update header counters according to new program filter
         updateHeaderCounters();
@@ -139,9 +177,7 @@ public class PlannedAdapter extends BaseAdapter {
                 numItems++;
             } else {
                 //Surveys are shown
-                if ((plannedItem.isShownByProgram(programFilter) || programFilter.getName().equals(
-                        PreferencesState.getInstance().getContext().getResources().getString(
-                                R.string.filter_all_org_assessments)))
+                if ((plannedItem.isShownByProgram(programUidFilter) || programUidFilter.equals(""))
                         && plannedItem.isShownByHeader(currentHeader)) {
                     numItems++;
                 }
@@ -162,35 +198,10 @@ public class PlannedAdapter extends BaseAdapter {
             }
             //Check match survey/program -> update header.counter
             PlannedSurvey plannedSurvey = (PlannedSurvey) plannedItem;
-            if (plannedSurvey.isShownByProgram(programFilter) || programFilter.getName().equals(
-                    PreferencesState.getInstance().getContext().getResources().getString(
-                            R.string.filter_all_org_assessments))) {
+            if (plannedSurvey.isShownByProgram(programUidFilter) || programUidFilter.equals("")) {
                 plannedSurvey.incHeaderCounter();
             }
         }
-    }
-
-    @Override
-    public Object getItem(int position) {
-        //No filter
-        Log.d(TAG, "getItem: " + position);
-
-        //Loop and count
-        int numShownItems = 0;
-        for (int i = 0; i < items.size(); i++) {
-            PlannedItem plannedItem = items.get(i);
-
-            if ((plannedItem.isShownByProgram(programFilter) || programFilter.getName().equals(
-                    PreferencesState.getInstance().getContext().getResources().getString(
-                            R.string.filter_all_org_assessments)))
-                    && plannedItem.isShownByHeader(currentHeader)) {
-                numShownItems++;
-                if (position == (numShownItems - 1)) {
-                    return plannedItem;
-                }
-            }
-        }
-        return null;
     }
 
     @Override
@@ -198,145 +209,166 @@ public class PlannedAdapter extends BaseAdapter {
         return getItem(position) != null ? getItem(position).hashCode() : 0L;
     }
 
-    @Override
-    public View getView(int position, View convertView, ViewGroup parent) {
-        Log.d(TAG, "getView: " + position);
-        PlannedItem plannedItem = (PlannedItem) getItem(position);
-        if (plannedItem instanceof PlannedHeader) {
-            itemOrder = 0;
-            return getViewByPlannedHeader((PlannedHeader) plannedItem, parent);
-        } else {
-            return getViewByPlannedSurvey(position, (PlannedSurvey) plannedItem, parent);
+
+    private void toggleSection(PlannedHeader header) {
+
+        //An empty section cannot be open
+        if (header == null || header.getCounter() == 0) {
+            return;
         }
+
+        //Annotate currentHeader
+        Log.d(TAG, "toggleSection: " + header);
+        currentHeader = (currentHeader == header) ? null : header;
+        applyFilter(programUidFilter);
     }
 
-    private View getViewByPlannedHeader(PlannedHeader plannedHeader, ViewGroup parent) {
-        LayoutInflater inflater = LayoutInflater.from(context);
-        LinearLayout rowLayout = (LinearLayout) inflater.inflate(R.layout.planning_header_row,
-                parent, false);
-        rowLayout.setBackgroundResource(plannedHeader.getBackgroundColor());
+    class PlanItemViewHolder extends RecyclerView.ViewHolder {
+        int itemOrder;
 
-        //Title
-        TextView textView = (TextView) rowLayout.findViewById(R.id.planning_title);
-        String titleHeader = String.format("%s (%d)",
-                context.getString(plannedHeader.getTitleHeader()), plannedHeader.getCounter());
-        textView.setText(titleHeader);
-        ImageView img = (ImageView) rowLayout.findViewById(R.id.planning_image_cross);
+        private TextView orgUnitTextView;
+        private TextView programTextView;
+        private TextView productivityTextView;
+        private TextView classificationTextView;
+        private TextView classificationLabelTextView;
+        private TextView scheduledDateTextView;
+        private ServerClassification serverClassification;
 
-        int color  = PreferencesState.getInstance().getContext().getResources().getColor(
-                R.color.black);
-        //Set image color
-        if (plannedHeader.equals(currentHeader)) {
-            img.setImageResource(R.drawable.ic_media_arrow_up);
-            img.setColorFilter(PreferencesState.getInstance().getContext().getResources().getColor(
-                    R.color.white));
-        } else {
-            if (plannedHeader.getTitleHeader() == R.string.dashboard_title_planned_type_never) {
-                color  =  PreferencesState.getInstance().getContext().getResources().getColor(
-                        R.color.white);
-                Typeface font = Typeface.createFromAsset(context.getAssets(), "fonts/"+context.getString(R.string.medium_font_name));
-                textView.setTypeface(font);
+        public PlanItemViewHolder(View itemView, ServerClassification serverClassification) {
+            super(itemView);
+
+            this.serverClassification = serverClassification;
+            orgUnitTextView = itemView.findViewById(R.id.planning_org_unit);
+            programTextView = itemView.findViewById(R.id.planning_program);
+            productivityTextView = itemView.findViewById(R.id.planning_survey_prod);
+            classificationTextView = itemView.findViewById(R.id.planning_survey_classification);
+            classificationLabelTextView = itemView.findViewById(
+                    R.id.planning_survey_classification_label);
+            scheduledDateTextView = itemView.findViewById(R.id.planning_survey_schedule_date);
+        }
+
+        void bindView(int position) {
+            PlannedSurvey plannedSurvey = (PlannedSurvey) getItem(position);
+            itemOrder = position;
+
+            orgUnitTextView.setText(plannedSurvey.getOrgUnit());
+            programTextView.setText(String.format("%s", plannedSurvey.getProgram()));
+            productivityTextView.setText(plannedSurvey.getProductivity());
+
+            assignClassificationValue(plannedSurvey);
+
+            DateParser dateParser = new DateParser();
+            scheduledDateTextView.setText(
+                    dateParser.getEuropeanFormattedDate(plannedSurvey.getNextAssesment()));
+            scheduledDateTextView.setOnClickListener(
+                    new ScheduleListener(plannedSurvey.getSurvey(), context));
+
+            ImageView dotsMenu = itemView.findViewById(R.id.menu_dots);
+
+            dotsMenu.setOnClickListener(view -> DashboardActivity.dashboardActivity.onPlannedSurvey(
+                    plannedSurvey.getSurvey(),
+                    new ScheduleListener(plannedSurvey.getSurvey(), context)));
+
+            assignBackgroundColor();
+            setUpActionButton(plannedSurvey);
+        }
+
+        private void assignClassificationValue(
+                PlannedSurvey plannedSurvey) {
+            if (serverClassification == ServerClassification.COMPETENCIES) {
+                CompetencyScoreClassification classification =
+                        CompetencyScoreClassification.get(
+                                plannedSurvey.getSurvey().getCompetencyScoreClassification());
+
+                CompetencyUtils.setTextByCompetencyAbbreviation(classificationTextView,
+                        classification);
+
+                classificationLabelTextView.setText(itemView.getContext().getText(
+                        R.string.competency_title));
             } else {
-                color  = PreferencesState.getInstance().getContext().getResources().getColor(
+                classificationTextView.setText(plannedSurvey.getQualityOfCare());
+                classificationLabelTextView.setText(itemView.getContext().getText(
+                        R.string.dashboard_title_planned_quality_of_care));
+            }
+        }
+
+        private void setUpActionButton(PlannedSurvey plannedSurvey) {
+            ImageView actionButton = itemView.findViewById(R.id.planning_survey_action);
+            if (plannedSurvey.getSurvey().isInProgress()) {
+                actionButton.setImageResource(R.drawable.ic_edit_action);
+            } else {
+                actionButton.setImageResource(R.drawable.ic_add_action);
+            }
+
+            //Planned survey -> onclick startSurvey
+            actionButton.setOnClickListener(
+                    new CreateOrEditSurveyListener(plannedSurvey.getSurvey()));
+        }
+
+        private void assignBackgroundColor() {
+            int colorId;
+            if (itemOrder == 0 || itemOrder % 2 == 0) {
+                colorId = PreferencesState.getInstance().getContext().getResources().getColor(
+                        R.color.white);
+                itemView.setBackgroundColor(colorId);
+            } else {
+                colorId = PreferencesState.getInstance().getContext().getResources().getColor(
+                        R.color.white_grey);
+                itemView.setBackgroundColor(colorId);
+            }
+        }
+    }
+
+    class PlanHeaderViewHolder extends RecyclerView.ViewHolder {
+
+        private TextView textView;
+        private ImageView img;
+
+        public PlanHeaderViewHolder(View itemView) {
+            super(itemView);
+
+            textView = itemView.findViewById(R.id.planning_title);
+            img = itemView.findViewById(R.id.planning_image_cross);
+        }
+
+        void bindView(int position) {
+            PlannedHeader plannedHeader = (PlannedHeader) getItem(position);
+            itemView.setBackgroundResource(plannedHeader.getBackgroundColor());
+
+
+            String titleHeader = String.format("%s (%d)",
+                    context.getString(plannedHeader.getTitleHeader()), plannedHeader.getCounter());
+            textView.setText(titleHeader);
+
+
+            int color = PreferencesState.getInstance().getContext().getResources().getColor(
                     R.color.black);
+            //Set image color
+            if (plannedHeader.equals(currentHeader)) {
+                img.setImageResource(R.drawable.ic_media_arrow_up);
+                img.setColorFilter(
+                        PreferencesState.getInstance().getContext().getResources().getColor(
+                                R.color.white));
+            } else {
+                img.setImageResource(R.drawable.ic_media_arrow);
+                if (plannedHeader.getTitleHeader() == R.string.dashboard_title_planned_type_never) {
+                    color = PreferencesState.getInstance().getContext().getResources().getColor(
+                            R.color.white);
+                    Typeface font = Typeface.createFromAsset(context.getAssets(),
+                            "fonts/" + context.getString(R.string.medium_font_name));
+                    textView.setTypeface(font);
+                } else {
+                    color = PreferencesState.getInstance().getContext().getResources().getColor(
+                            R.color.black);
+                }
             }
+            img.setColorFilter(color);
+            textView.setTextColor(color);
+
+            itemView.setOnClickListener(new OpenHeaderListener(plannedHeader));
         }
-        img.setColorFilter(color);
-        textView.setTextColor(color);
-/*
-        //Productivity
-        textView=(TextView)rowLayout.findViewById(R.id.planning_prod);
-        textView.setText(plannedHeader.getProductivityHeader());
-
-        //Quality of Care
-        textView=(TextView)rowLayout.findViewById(R.id.planning_qoc);
-        textView.setText(plannedHeader.getQualityOfCareHeader());
-
-        //Next
-        textView=(TextView)rowLayout.findViewById(R.id.planning_next);
-        textView.setText(plannedHeader.getNextHeader());*/
-
-        //Planned header -> toggleSection
-        rowLayout.setOnClickListener(new OpenHeaderListener(plannedHeader));
-        return rowLayout;
     }
 
-    private View getViewByPlannedSurvey(int position, final PlannedSurvey plannedSurvey,
-            ViewGroup parent) {
-        itemOrder++;
-        LayoutInflater inflater = LayoutInflater.from(context);
-        LinearLayout rowLayout = (LinearLayout) inflater.inflate(R.layout.planning_survey_row,
-                parent, false);
-
-        //OrgUnit
-        TextView textView = (TextView) rowLayout.findViewById(R.id.planning_org_unit);
-        textView.setText(plannedSurvey.getOrgUnit());
-
-        //Program
-        textView = (TextView) rowLayout.findViewById(R.id.planning_program);
-        textView.setText(String.format("%s", plannedSurvey.getProgram()));
-
-        //Productivity
-        textView = (TextView) rowLayout.findViewById(R.id.planning_survey_prod);
-        textView.setText(plannedSurvey.getProductivity());
-
-        //QualityOfCare
-        textView = (TextView) rowLayout.findViewById(R.id.planning_survey_qoc);
-        textView.setText(plannedSurvey.getQualityOfCare());
-
-        //ScheduledDate
-        textView = (TextView) rowLayout.findViewById(R.id.planning_survey_schedule_date);
-        DateParser dateParser = new DateParser();
-        textView.setText(dateParser.getEuropeanFormattedDate(plannedSurvey.getNextAssesment()));
-        textView.setOnClickListener(new ScheduleListener(plannedSurvey.getSurvey(), context));
-
-        ImageView dotsMenu = (ImageView) rowLayout.findViewById(R.id.menu_dots);
-        dotsMenu.setOnClickListener(new View.OnClickListener() {
-            @Override
-            public void onClick(View view) {
-                DashboardActivity.dashboardActivity.onPlannedSurvey(plannedSurvey.getSurvey(), new ScheduleListener(plannedSurvey.getSurvey(), context));
-            }
-        });
-        //background color
-        int colorId = plannedSurvey.getPlannedHeader().getSecondaryColor();
-        int fixposition = itemOrder - 1;
-        if (fixposition == 0 || fixposition % 2 == 0) {
-            colorId = PreferencesState.getInstance().getContext().getResources().getColor(
-                    R.color.white);
-            rowLayout.setBackgroundColor(colorId);
-        } else {
-            colorId = PreferencesState.getInstance().getContext().getResources().getColor(
-                    R.color.white_grey);
-            rowLayout.setBackgroundColor(colorId);
-        }
-        //Action
-        ImageButton actionButton = (ImageButton) rowLayout.findViewById(
-                R.id.planning_survey_action);
-        if (plannedSurvey.getSurvey().isInProgress()) {
-            actionButton.setImageResource(R.drawable.ic_edit);
-            actionButton.setColorFilter(PreferencesState.getInstance().getContext().getResources().getColor(
-                    R.color.assess_yellow));
-        } else {
-            actionButton.setImageResource(R.drawable.red_circle_cross);
-            actionButton.setColorFilter(PreferencesState.getInstance().getContext().getResources().getColor(
-                    R.color.plan_grey_light));
-        }
-
-        //Planned survey -> onclick startSurvey
-        actionButton.setOnClickListener(new CreateOrEditSurveyListener(plannedSurvey.getSurvey()));
-
-        return rowLayout;
-    }
-
-    private boolean isSameOrgUnit(PlannedSurvey plannedSurvey, int currentPosition) {
-        PlannedItem plannedItem = (PlannedItem) getItem(currentPosition - 1);
-
-        if (plannedItem instanceof PlannedHeader) {
-            return false;
-        }
-        PlannedSurvey previousPlannedSurvey = (PlannedSurvey) plannedItem;
-        return plannedSurvey.getOrgUnit().equals(previousPlannedSurvey.getOrgUnit());
-    }
 
     /**
      * Listener that starts the given planned survey and goes to surveyActivity to start with

@@ -24,65 +24,62 @@ import android.content.Context;
 import android.content.Intent;
 import android.content.IntentFilter;
 import android.os.Bundle;
-import android.support.v4.app.ListFragment;
-import android.support.v4.content.LocalBroadcastManager;
+
+import androidx.localbroadcastmanager.content.LocalBroadcastManager;
+import androidx.recyclerview.widget.RecyclerView;
 import android.util.Log;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
 
+import org.eyeseetea.malariacare.DashboardActivity;
 import org.eyeseetea.malariacare.R;
-import org.eyeseetea.malariacare.data.database.model.OrgUnitDB;
-import org.eyeseetea.malariacare.data.database.model.ProgramDB;
 import org.eyeseetea.malariacare.data.database.utils.PreferencesState;
 import org.eyeseetea.malariacare.data.database.utils.Session;
 import org.eyeseetea.malariacare.data.database.utils.planning.PlannedItem;
 import org.eyeseetea.malariacare.data.database.utils.services.PlannedServiceBundle;
+import org.eyeseetea.malariacare.domain.entity.ServerClassification;
 import org.eyeseetea.malariacare.layout.adapters.survey.PlannedAdapter;
 import org.eyeseetea.malariacare.services.PlannedSurveyService;
 import org.eyeseetea.malariacare.views.filters.OrgUnitProgramFilterView;
 
 import java.util.List;
 
-/**
- * Created by ivan.arrizabalaga on 15/12/2015.
- */
-public class PlannedFragment extends ListFragment implements IModuleFragment{
+public class PlannedFragment extends FiltersFragment implements IModuleFragment {
     public static final String TAG = ".PlannedFragment";
 
     private PlannedItemsReceiver plannedItemsReceiver;
 
-    private PlannedAdapter adapter;
+    private String programUidFilter;
 
-    OrgUnitProgramFilterView orgUnitProgramFilterView;
+    private View rootView;
+    private RecyclerView plannedRecyclerView;
+    private PlannedAdapter plannedAdapter;
 
+    private static String SERVER_CLASSIFICATION = "ServerClassification";
+    private ServerClassification serverClassification;
 
-    private List<ProgramDB> programList;
-    private List<OrgUnitDB> orgUnitList;
+    public static PlannedFragment newInstance(ServerClassification serverClassification) {
+        PlannedFragment fragment = new PlannedFragment();
 
-    private ProgramDB programFilter;
-    List<PlannedItem> plannedItemList;
-    public PlannedFragment() {
+        Bundle args = new Bundle();
+        args.putInt(SERVER_CLASSIFICATION, serverClassification.getCode());
+        fragment.setArguments(args);
 
-    }
-
-
-    @Override
-    public void onCreate(Bundle savedInstanceState){
-        Log.d(TAG, "onCreate");
-        super.onCreate(savedInstanceState);
+        return fragment;
     }
 
     @Override
-    public View onCreateView(LayoutInflater inflater, ViewGroup container,Bundle savedInstanceState) {
-        Log.d(TAG, "onCreateView");
-        if (container == null) {
-            return null;
-        }
+    public View onCreateView(LayoutInflater inflater, ViewGroup container,
+            Bundle savedInstanceState) {
+        rootView = inflater.inflate(R.layout.fragment_plan, container, false);
 
-        loadFilter();
+        serverClassification = ServerClassification.Companion.get(
+                getArguments().getInt(SERVER_CLASSIFICATION));
 
-        return super.onCreateView(inflater, container, savedInstanceState);
+        initializeRecyclerView();
+
+        return rootView;
     }
 
     @Override
@@ -91,63 +88,49 @@ public class PlannedFragment extends ListFragment implements IModuleFragment{
         super.onActivityCreated(savedInstanceState);
     }
 
-    private void prepareUI(List<PlannedItem> plannedItemList) {
-        this.adapter = new PlannedAdapter(plannedItemList,getActivity());
-        this.setListAdapter(adapter);
+    private void refreshPlannedItems(List<PlannedItem> plannedItemList) {
+        plannedAdapter.setItems(plannedItemList);
 
         reloadFilter();
     }
 
-    public void reloadFilter(){
+    private void initializeRecyclerView() {
+        plannedRecyclerView = rootView.findViewById(R.id.planList);
 
-        ProgramDB selectedProgram = orgUnitProgramFilterView.getSelectedProgramFilter();
+        plannedAdapter = new PlannedAdapter(getActivity(), serverClassification);
+        plannedRecyclerView.setAdapter(plannedAdapter);
+    }
 
-        if(selectedProgram!=null) {
-            loadProgram(selectedProgram);
-        }
-        if(adapter!=null){
-            adapter.notifyDataSetChanged();
+
+    private void reloadFilter() {
+        loadProgram(getSelectedProgramUidFilter());
+
+        if (plannedAdapter != null) {
+            plannedAdapter.notifyDataSetChanged();
         }
     }
 
     @Override
-    public void onResume(){
+    public void onResume() {
         Log.d(TAG, "onResume");
-        //Loading...
-        setListShown(false);
         //Listen for data
         registerPlannedItemsReceiver();
         super.onResume();
     }
 
     @Override
-    public void onStop(){
+    public void onStop() {
         Log.d(TAG, "onStop");
         unregisterPlannedItemsReceiver();
         super.onStop();
     }
 
     @Override
-    public void onPause(){
+    public void onPause() {
         Log.d(TAG, "onPause");
         unregisterPlannedItemsReceiver();
 
         super.onPause();
-    }
-
-    private void updateSelectedFilters() {
-        if (orgUnitProgramFilterView == null) {
-            loadFilter();
-        }
-        String programUidFilter = PreferencesState.getInstance().getProgramUidFilter();
-        String orgUnitUidFilter = PreferencesState.getInstance().getOrgUnitUidFilter();
-        orgUnitProgramFilterView.changeSelectedFilters(programUidFilter, orgUnitUidFilter);
-    }
-
-    private void loadFilter() {
-        orgUnitProgramFilterView =
-                (OrgUnitProgramFilterView) org.eyeseetea.malariacare.DashboardActivity.dashboardActivity
-                        .findViewById(R.id.plan_org_unit_program_filter_view);
     }
 
     /**
@@ -162,6 +145,7 @@ public class PlannedFragment extends ListFragment implements IModuleFragment{
                     new IntentFilter(PlannedSurveyService.PLANNED_SURVEYS_ACTION));
         }
     }
+
     /**
      * Unregisters the survey receiver.
      * It really important to do this, otherwise each receiver will invoke its code.
@@ -169,14 +153,34 @@ public class PlannedFragment extends ListFragment implements IModuleFragment{
     public void unregisterPlannedItemsReceiver() {
         Log.d(TAG, "unregisterPlannedItemsReceiver");
         if (plannedItemsReceiver != null) {
-            LocalBroadcastManager.getInstance(getActivity()).unregisterReceiver(plannedItemsReceiver);
+            LocalBroadcastManager.getInstance(getActivity()).unregisterReceiver(
+                    plannedItemsReceiver);
             plannedItemsReceiver = null;
         }
     }
 
     @Override
-    public void reloadData(){
-        updateSelectedFilters();
+    protected void onFiltersChanged() {
+        if (!getSelectedOrgUnitUidFilter().isEmpty()) {
+            DashboardActivity.dashboardActivity.onOrgUnitSelected(getSelectedOrgUnitUidFilter());
+        } else {
+            reloadFilter();
+        }
+    }
+
+    @Override
+    protected OrgUnitProgramFilterView.FilterType getFilterType() {
+        return OrgUnitProgramFilterView.FilterType.EXCLUSIVE;
+    }
+
+    @Override
+    protected int getOrgUnitProgramFilterViewId() {
+        return R.id.plan_org_unit_program_filter_view;
+    }
+
+    @Override
+    public void reloadData() {
+        super.reloadData();
 
         //Reload data using service
         Intent surveysIntent = new Intent(
@@ -184,17 +188,17 @@ public class PlannedFragment extends ListFragment implements IModuleFragment{
                 PlannedSurveyService.class);
         surveysIntent.putExtra(PlannedSurveyService.SERVICE_METHOD,
                 PlannedSurveyService.PLANNED_SURVEYS_ACTION);
-        PreferencesState.getInstance().getContext().getApplicationContext().startService(surveysIntent);
+        PreferencesState.getInstance().getContext().getApplicationContext().startService(
+                surveysIntent);
     }
 
-    public void loadProgram(ProgramDB program) {
-        Log.d(TAG,"Loading program: "+program.getUid());
-        programFilter=program;
-        if(adapter!=null){
-            adapter.applyFilter(programFilter);
-            adapter.notifyDataSetChanged();
-        }
-        else {
+    public void loadProgram(String programUid) {
+        Log.d(TAG, "Loading program: " + programUid);
+        programUidFilter = programUid;
+        if (plannedAdapter != null) {
+            plannedAdapter.applyFilter(programUidFilter);
+            plannedAdapter.notifyDataSetChanged();
+        } else {
             reloadData();
         }
     }
@@ -215,12 +219,7 @@ public class PlannedFragment extends ListFragment implements IModuleFragment{
                         (PlannedServiceBundle) Session.popServiceValue(
                                 PlannedSurveyService.PLANNED_SURVEYS_ACTION);
 
-                prepareUI(plannedServiceBundle.getPlannedItems());
-
-                setListShown(true);
-                adapter.notifyDataSetChanged();
-
-                updateSelectedFilters();
+                refreshPlannedItems(plannedServiceBundle.getPlannedItems());
             }
         }
     }

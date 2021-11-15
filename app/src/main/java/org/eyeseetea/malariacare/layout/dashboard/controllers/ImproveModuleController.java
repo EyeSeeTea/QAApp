@@ -20,7 +20,7 @@
 package org.eyeseetea.malariacare.layout.dashboard.controllers;
 
 
-import android.support.v4.app.Fragment;
+import androidx.fragment.app.Fragment;
 import android.view.View;
 import android.widget.LinearLayout;
 
@@ -31,7 +31,7 @@ import org.eyeseetea.malariacare.data.database.utils.PreferencesState;
 import org.eyeseetea.malariacare.data.database.utils.Session;
 import org.eyeseetea.malariacare.fragments.DashboardSentFragment;
 import org.eyeseetea.malariacare.fragments.FeedbackFragment;
-import org.eyeseetea.malariacare.fragments.PlanActionFragment;
+import org.eyeseetea.malariacare.fragments.ObservationsFragment;
 import org.eyeseetea.malariacare.layout.dashboard.config.DashboardOrientation;
 import org.eyeseetea.malariacare.layout.dashboard.config.ModuleSettings;
 import org.eyeseetea.malariacare.layout.utils.LayoutUtils;
@@ -39,51 +39,50 @@ import org.eyeseetea.malariacare.views.filters.OrgUnitProgramFilterView;
 
 public class ImproveModuleController extends ModuleController {
 
-    FeedbackFragment feedbackFragment;
-    PlanActionFragment mPlanActionFragment;
+    private FeedbackFragment feedbackFragment;
+    private ObservationsFragment mObservationsFragment;
 
-    OrgUnitProgramFilterView orgUnitProgramFilterView;
+    private OrgUnitProgramFilterView orgUnitProgramFilterView;
+
+    private LinearLayout filtersContainer;
 
     private boolean isSurveyFeedbackOpen;
 
-    public ImproveModuleController(ModuleSettings moduleSettings){
+    public ImproveModuleController(ModuleSettings moduleSettings) {
         super(moduleSettings);
-        this.tabLayout=R.id.tab_improve_layout;
+        this.tabLayout = R.id.tab_improve_layout;
         this.idVerticalTitle = R.id.titleCompleted;
     }
 
 
-    public static String getSimpleName(){
+    public static String getSimpleName() {
         return ImproveModuleController.class.getSimpleName();
     }
 
     @Override
     public void init(DashboardActivity activity) {
         super.init(activity);
-        fragment = new DashboardSentFragment();
-        try {
-            LinearLayout filters = (LinearLayout) dashboardActivity.findViewById(R.id.filters_sentSurveys);
-            filters.setVisibility(View.VISIBLE);
-        }catch(Exception e){
-            e.printStackTrace();
-        }
+        fragment = DashboardSentFragment.newInstance(server.getClassification());
+        filtersContainer = dashboardActivity.findViewById(R.id.filters_sentSurveys);
+        filtersContainer.setVisibility(View.VISIBLE);
     }
 
-    public void onExitTab(){
-        if(!isFragmentActive(FeedbackFragment.class) && !isFragmentActive(PlanActionFragment.class)){
+    public void onExitTab() {
+        if (!isFragmentActive(FeedbackFragment.class) && !isFragmentActive(
+                ObservationsFragment.class)) {
             return;
         }
 
         closeFeedbackFragment();
     }
 
-    public void onTabChanged(){
+    public void onTabChanged() {
         if (!isSurveyFeedbackOpen) {
             if (fragment == null || !fragment.isAdded()) {
                 reloadFragment();
             }
             if (isFragmentActive(FeedbackFragment.class) || isFragmentActive(
-                    PlanActionFragment.class)) {
+                    ObservationsFragment.class)) {
                 return;
             }
             super.onTabChanged();
@@ -100,15 +99,17 @@ public class ImproveModuleController extends ModuleController {
         closeFeedbackFragment();
     }
 
-    public void onFeedbackSelected(SurveyDB survey, boolean modifyFilter){
+    public void onFeedbackSelected(String surveyUid, boolean modifyFilter) {
+        SurveyDB surveyDB = SurveyDB.getSurveyByUId(surveyUid);
+
+        onFeedbackSelected(surveyDB, modifyFilter);
+    }
+
+    public void onFeedbackSelected(SurveyDB survey, boolean modifyFilter) {
         Session.setSurveyByModule(survey, getSimpleName());
-        try {
-            LinearLayout filters = (LinearLayout) dashboardActivity.findViewById(R.id.filters_sentSurveys);
-            filters.setVisibility(View.GONE);
-        }catch(Exception e){
-            e.printStackTrace();
-        }
-        feedbackFragment = new FeedbackFragment();
+        filtersContainer.setVisibility(View.GONE);
+
+        feedbackFragment = FeedbackFragment.newInstance(server.getClassification());
         // Add the fragment to the activity, pushing this transaction
         // on to the back stack.
         feedbackFragment.setModuleName(getSimpleName());
@@ -116,23 +117,19 @@ public class ImproveModuleController extends ModuleController {
         LayoutUtils.setActionBarTitleForSurvey(dashboardActivity, survey);
         isSurveyFeedbackOpen = true;
 
-        if(modifyFilter) {
+        if (modifyFilter) {
             UpdateFiltersBySurvey(survey);
         }
     }
 
-    public void onPlanActionSelected(SurveyDB survey){
+    public void onPlanActionSelected(SurveyDB survey) {
         Session.setSurveyByModule(survey, getSimpleName());
-        try {
-            LinearLayout filters = (LinearLayout) dashboardActivity.findViewById(R.id.filters_sentSurveys);
-            filters.setVisibility(View.GONE);
-        }catch(Exception e){
-            e.printStackTrace();
-        }
+        filtersContainer.setVisibility(View.GONE);
 
-        mPlanActionFragment = PlanActionFragment.newInstance(survey.getId_survey());
+        mObservationsFragment = ObservationsFragment.newInstance(survey.getEventUid(),
+                server.getClassification());
 
-        replaceFragment(R.id.dashboard_completed_container, mPlanActionFragment);
+        replaceFragment(R.id.dashboard_completed_container, mObservationsFragment);
 
         UpdateFiltersBySurvey(survey);
     }
@@ -145,23 +142,28 @@ public class ImproveModuleController extends ModuleController {
     }
 
     private void closeFeedbackFragment() {
-        Fragment fragment = dashboardActivity.getSupportFragmentManager ().findFragmentById(R.id.dashboard_completed_container);
-        if(fragment instanceof  FeedbackFragment) {
+        Fragment fragment = dashboardActivity.getSupportFragmentManager().findFragmentById(
+                R.id.dashboard_completed_container);
+        if (fragment instanceof FeedbackFragment) {
             feedbackFragment.unregisterReceiver();
-            if(feedbackFragment.getView()!=null){
+            if (feedbackFragment.getView() != null) {
                 feedbackFragment.getView().setVisibility(View.GONE);
             }
-        }else if(fragment instanceof PlanActionFragment){
-            if (feedbackFragment != null)
+        } else if (fragment instanceof ObservationsFragment) {
+            filtersContainer.setVisibility(View.VISIBLE);
+
+            if (feedbackFragment != null) {
                 replaceFragment(R.id.dashboard_completed_container, feedbackFragment);
-            else
+            } else {
                 replaceFragment(R.id.dashboard_completed_container, super.fragment);
+            }
         }
 
         //Reload improve fragment
         if (DashboardOrientation.VERTICAL.equals(dashboardController.getOrientation())) {
             dashboardController.reloadVertical();
-        } else if (fragment instanceof FeedbackFragment) {
+        } else if (fragment instanceof FeedbackFragment
+                || fragment instanceof ObservationsFragment) {
             reloadFragment();
         }
 

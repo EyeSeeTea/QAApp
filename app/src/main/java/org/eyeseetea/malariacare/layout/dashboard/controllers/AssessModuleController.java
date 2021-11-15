@@ -24,7 +24,7 @@ import android.app.AlertDialog;
 import android.content.DialogInterface;
 import android.graphics.Color;
 import android.graphics.PorterDuff;
-import android.support.annotation.NonNull;
+import androidx.annotation.NonNull;
 import android.util.Log;
 import android.view.View;
 import android.widget.Button;
@@ -40,6 +40,7 @@ import org.eyeseetea.malariacare.domain.boundary.executors.IAsyncExecutor;
 import org.eyeseetea.malariacare.domain.boundary.executors.IMainExecutor;
 import org.eyeseetea.malariacare.domain.boundary.repositories.ISurveyAnsweredRatioRepository;
 import org.eyeseetea.malariacare.domain.entity.SurveyAnsweredRatio;
+import org.eyeseetea.malariacare.domain.usecase.CompleteSurveyUseCase;
 import org.eyeseetea.malariacare.domain.usecase.GetSurveyAnsweredRatioUseCase;
 import org.eyeseetea.malariacare.domain.usecase.ISurveyAnsweredRatioCallback;
 import org.eyeseetea.malariacare.domain.usecase.SaveSurveyAnsweredRatioUseCase;
@@ -72,6 +73,8 @@ public class AssessModuleController extends ModuleController {
     SaveSurveyAnsweredRatioUseCase saveSurveyAnsweredRatioUseCase;
     GetSurveyAnsweredRatioUseCase getSurveyAnsweredRatioUseCase;
 
+    CompleteSurveyUseCase completeSurveyUseCase;
+
     public AssessModuleController(ModuleSettings moduleSettings) {
         super(moduleSettings);
         this.tabLayout = R.id.tab_assess_layout;
@@ -91,6 +94,8 @@ public class AssessModuleController extends ModuleController {
 
         getSurveyAnsweredRatioUseCase = new GetSurveyAnsweredRatioUseCase(
                 surveyAnsweredRatioRepository, mainExecutor, asyncExecutor);
+
+        completeSurveyUseCase = new CompleteSurveyUseCase(mainExecutor,asyncExecutor);
     }
 
     public static String getSimpleName() {
@@ -441,7 +446,7 @@ public class AssessModuleController extends ModuleController {
         new AlertDialog.Builder(dashboardActivity)
                 .setMessage(
                         dashboardActivity.getString(R.string.dialog_incompleted_compulsory_survey))
-                .setPositiveButton(dashboardActivity.getString(R.string.accept), null)
+                .setPositiveButton(dashboardActivity.getString(R.string.ok), null)
                 .create().show();
     }
 
@@ -461,19 +466,27 @@ public class AssessModuleController extends ModuleController {
     }
 
     private void completeAndCloseSurvey(SurveyDB survey) {
-        survey.setCompleteSurveyState(getSimpleName());
+        completeSurveyUseCase.execute(survey, new CompleteSurveyUseCase.Callback() {
+            @Override
+            public void onCompleteSurveySuccess() {
+                if (!survey.isInProgress()) {
+                    alertOnCompleteGoToFeedback(survey);
+                }
 
-        if (!survey.isInProgress()) {
-            alertOnCompleteGoToFeedback(survey);
-        }
+                dashboardController.setNavigatingBackwards(true);
+                closeSurveyFragment();
+                if (DashboardOrientation.VERTICAL.equals(
+                        dashboardController.getOrientation())) {
+                    dashboardController.reloadVertical();
+                }
+                dashboardController.setNavigatingBackwards(false);
+            }
 
-        dashboardController.setNavigatingBackwards(true);
-        closeSurveyFragment();
-        if (DashboardOrientation.VERTICAL.equals(
-                dashboardController.getOrientation())) {
-            dashboardController.reloadVertical();
-        }
-        dashboardController.setNavigatingBackwards(false);
+            @Override
+            public void onCompleteSurveyError(Exception e) {
+                Log.e(getSimpleName(), e.getMessage());
+            }
+        });
     }
 
     private void alertOnComplete(SurveyDB survey) {
@@ -508,58 +521,64 @@ public class AssessModuleController extends ModuleController {
                 R.id.dashboard_details_container);
     }
 
-    public AlertDialog assessModelDialog(@NonNull final SurveyDB survey) {
+    private SurveyDialog surveyDialog;
 
-        SurveyDialog.Builder builder = SurveyDialog.newBuilder(dashboardActivity, survey);
+    public void assessModelDialog(@NonNull final SurveyDB survey) {
 
-        final View.OnClickListener editButtonListener = new View.OnClickListener() {
-            @Override
-            public void onClick(View v) {
-                onSurveySelected(survey);
-            }
-        };
+        if (surveyDialog == null || !surveyDialog.isShowing()) {
 
-        final View.OnClickListener completeButtonListener = new View.OnClickListener() {
-            @Override
-            public void onClick(View v) {
-                onMarkAsCompleted(survey);
-            }
-        };
+            SurveyDialog.Builder builder = SurveyDialog.newBuilder(dashboardActivity, survey);
 
-        final View.OnClickListener deleteButtonListener = new View.OnClickListener() {
-            @Override
-            public void onClick(View v) {
-                //this method create a new survey getting the getScheduledDate date of the
-                // oldsurvey, and remove it.
-                SurveyPlanner.getInstance().deleteSurveyAndBuildNext(survey);
-                DashboardActivity.reloadDashboard();
-            }
-        };
+            final View.OnClickListener editButtonListener = new View.OnClickListener() {
+                @Override
+                public void onClick(View v) {
+                    onSurveySelected(survey);
+                }
+            };
 
-        final SurveyDialog surveyDialog =  builder.editButton(editButtonListener)
-                .completeButton(completeButtonListener, true)
-                .deleteButton(deleteButtonListener)
-                .build();
+            final View.OnClickListener completeButtonListener = new View.OnClickListener() {
+                @Override
+                public void onClick(View v) {
+                    onMarkAsCompleted(survey);
+                }
+            };
 
-        getSurveyAnsweredRatioUseCase.execute(survey.getId_survey(),
-                new ISurveyAnsweredRatioCallback() {
-                    @Override
-                    public void nextProgressMessage() {
+            final View.OnClickListener deleteButtonListener = new View.OnClickListener() {
+                @Override
+                public void onClick(View v) {
+                    //this method create a new survey getting the getScheduledDate date of the
+                    // oldsurvey, and remove it.
+                    SurveyPlanner.getInstance().deleteSurveyAndBuildNext(survey);
+                    DashboardActivity.reloadDashboard();
+                }
+            };
 
-                    }
+            surveyDialog = builder.editButton(editButtonListener)
+                    .completeButton(completeButtonListener, true)
+                    .deleteButton(deleteButtonListener)
+                    .build();
 
-                    @Override
-                    public void onComplete(SurveyAnsweredRatio surveyAnsweredRatio) {
-                        boolean isCompulsoryCompleted = surveyAnsweredRatio.isCompulsoryCompleted();
-                        Button button = surveyDialog.getMarkCompleteButton();
+            getSurveyAnsweredRatioUseCase.execute(survey.getId_survey(),
+                    new ISurveyAnsweredRatioCallback() {
+                        @Override
+                        public void nextProgressMessage() {
 
-                        if(!isCompulsoryCompleted) {
-                            button.getBackground().setColorFilter(Color.GRAY, PorterDuff.Mode.SRC_IN);
-                            button.setEnabled(false);
                         }
-                    }
-                });
 
-        return surveyDialog;
+                        @Override
+                        public void onComplete(SurveyAnsweredRatio surveyAnsweredRatio) {
+                            boolean isCompulsoryCompleted =
+                                    surveyAnsweredRatio.isCompulsoryCompleted();
+                            Button button = surveyDialog.getMarkCompleteButton();
+
+                            if (!isCompulsoryCompleted) {
+                                button.getBackground().setColorFilter(Color.GRAY,
+                                        PorterDuff.Mode.SRC_IN);
+                                button.setEnabled(false);
+                            }
+                        }
+                    });
+        }
+
     }
 }

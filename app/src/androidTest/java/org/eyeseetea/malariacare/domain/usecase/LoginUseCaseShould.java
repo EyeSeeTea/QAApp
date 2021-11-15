@@ -19,16 +19,21 @@
 
 package org.eyeseetea.malariacare.domain.usecase;
 
-import android.support.test.InstrumentationRegistry;
+import androidx.test.platform.app.InstrumentationRegistry;
 
 import org.eyeseetea.malariacare.data.database.datasources.ServerInfoLocalDataSource;
+import org.eyeseetea.malariacare.data.file.AssetsFileReader;
 import org.eyeseetea.malariacare.data.remote.api.ServerInfoRemoteDataSource;
 import org.eyeseetea.malariacare.data.repositories.ServerInfoRepository;
+import org.eyeseetea.malariacare.data.repositories.ServerRepository;
 import org.eyeseetea.malariacare.data.repositories.UserAccountRepository;
 import org.eyeseetea.malariacare.domain.boundary.executors.IAsyncExecutor;
 import org.eyeseetea.malariacare.domain.boundary.executors.IMainExecutor;
+import org.eyeseetea.malariacare.domain.boundary.repositories.UserRepository;
+import org.eyeseetea.malariacare.domain.common.Either;
 import org.eyeseetea.malariacare.domain.entity.Credentials;
 import org.eyeseetea.malariacare.domain.entity.ServerInfo;
+import org.eyeseetea.malariacare.domain.entity.User;
 import org.eyeseetea.malariacare.presentation.executors.UIThreadExecutor;
 import org.eyeseetea.malariacare.rules.MockWebServerRule;
 import org.junit.Assert;
@@ -41,15 +46,23 @@ import org.mockito.junit.MockitoRule;
 import static org.junit.Assert.fail;
 import static org.mockito.Mockito.when;
 
+import java.util.ArrayList;
+
 public class LoginUseCaseShould {
 
-    private static final String SYSTEM_INFO_VERSION_30 = "system_info_30.json";
+    private static final String SYSTEM_INFO_VERSION_33 = "system_info_33.json";
     private static final String AUTH = "auth.json";
 
     @Rule
     public MockitoRule rule = MockitoJUnit.rule();
     @Rule
-    public MockWebServerRule mockWebServerRule = new MockWebServerRule();
+    public MockWebServerRule mockWebServerRule = new MockWebServerRule(new AssetsFileReader());
+    @Mock
+    ServerRepository serverRepository;
+    @Mock
+    UserRepository userRepository;
+    @Mock
+    UserRepository mUserRepository;
     @Mock
     ServerInfoLocalDataSource mServerLocalDataSource;
     @Test
@@ -81,6 +94,11 @@ public class LoginUseCaseShould {
             }
 
             @Override
+            public void onRequiredAuthorityError(String authority) {
+                fail("onRequiredAuthorityError");
+            }
+
+            @Override
             public void onUnsupportedServerVersion() {
                 fail("onServerVersionError");
             }
@@ -93,7 +111,7 @@ public class LoginUseCaseShould {
         int actualVersion = -1;
         LoginUseCase loginUseCase = givenLoginUseCase(credentials, actualVersion);
 
-        mockWebServerRule.getMockServer().enqueueMockResponseFileName(200, SYSTEM_INFO_VERSION_30);
+        mockWebServerRule.getMockServer().enqueueMockResponseFileName(200, SYSTEM_INFO_VERSION_33);
         mockWebServerRule.getMockServer().enqueueMockResponseFileName(200, AUTH);
         loginUseCase.execute(credentials, new LoginUseCase.Callback() {
 
@@ -112,6 +130,10 @@ public class LoginUseCaseShould {
                 fail("onInvalidCredentials");
             }
 
+            @Override
+            public void onRequiredAuthorityError(String authority) {
+                fail("onRequiredAuthorityError");
+            }
             @Override
             public void onNetworkError() {
                 fail("onNetworkError");
@@ -133,9 +155,16 @@ public class LoginUseCaseShould {
             }
         };
         when(mServerLocalDataSource.get()).thenReturn(new ServerInfo(serverVersion));
-        ServerInfoRemoteDataSource mServerRemoteDataSource = new ServerInfoRemoteDataSource(credentials);
+
+        when(mUserRepository.getCurrent()).thenReturn(new Either.Right(new User("id","name",new ArrayList<>())));
+        ServerInfoRemoteDataSource mServerRemoteDataSource = new ServerInfoRemoteDataSource(InstrumentationRegistry.getInstrumentation().getTargetContext());
         ServerInfoRepository serverInfoRepository = new ServerInfoRepository(mServerLocalDataSource, mServerRemoteDataSource);
-        return new LoginUseCase(new UserAccountRepository(InstrumentationRegistry.getTargetContext()),
-                serverInfoRepository, mainExecutor, asyncExecutor);
+        return new LoginUseCase(
+                new UserAccountRepository(InstrumentationRegistry.getInstrumentation().getTargetContext()),
+                serverRepository,
+                serverInfoRepository,
+                userRepository,
+                mainExecutor,
+                asyncExecutor);
     }
 }
