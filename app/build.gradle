@@ -37,12 +37,7 @@ android {
     }
 
     signingConfigs {
-        config {
-            storeFile file('/home/nacho/EyeSeeTea/utils/eyeseekey.jks')
-            storePassword '3y3533T34'
-            keyAlias 'eyeseekey'
-            keyPassword '3y3533T34'
-        }
+        config {}
     }
     sourceSets {
         String sharedTestDir = 'src/sharedTest/java'
