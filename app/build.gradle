@@ -58,8 +58,7 @@ android {
         jvmTarget = JavaVersion.VERSION_1_8.toString()
     }
 
-    compileSdkVersion cfg.compileSdkVersion
-    buildToolsVersion cfg.buildToolsVersion
+    compileSdk cfg.compileSdkVersion
 
     defaultConfig {
         applicationId 'org.eyeseetea.malariacare'
@@ -122,7 +121,7 @@ android {
         }
         hnqis {
             applicationId "org.eyeseetea.malariacare.hnqis_ng"
-            versionName "1.6.15"
+            versionName "1.7.3"
             buildConfigField "boolean", "translations", "true"
             buildConfigField "String", "defaultLocale", "\"en\""
             resValue "string", "authority", applicationId+versionName+"_DHIS2_DEFAULT_AUTHORITY"
@@ -191,6 +190,9 @@ dependencies {
     }
 
     implementation "com.google.code.findbugs:jsr305:${libs.jsr305Version}"
+
+    implementation "androidx.work:work-runtime-ktx:${libs.work_version}"
+
 
     // Square
     implementation "com.squareup.okhttp3:okhttp:${libs.okhttpVersion}"
